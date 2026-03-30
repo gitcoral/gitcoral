@@ -1,12 +1,10 @@
-import { Component, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component } from '@angular/core';
+import { Viewer } from './features/viewer/viewer/viewer';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet],
-  templateUrl: './app.html',
-  styleUrl: './app.scss'
+  imports: [Viewer],
+  template: '<app-viewer />',
+  styles: [':host { display: block; width: 100%; height: 100%; }'],
 })
-export class App {
-  protected readonly title = signal('code-orb');
-}
+export class App {}

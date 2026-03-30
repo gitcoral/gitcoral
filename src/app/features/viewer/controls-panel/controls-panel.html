@@ -1,0 +1,73 @@
+<div class="panel" [class.collapsed]="collapsed">
+
+  <div class="panel-header">
+    <span class="panel-title">CodeOrb</span>
+    <button class="collapse-btn" (click)="toggleCollapse()">
+      {{ collapsed ? '»' : '«' }}
+    </button>
+  </div>
+
+  @if (!collapsed) {
+    <div class="panel-body">
+
+      <!-- Repo input -->
+      <section class="section">
+        <label class="section-label">Repository</label>
+        <input
+          class="repo-input"
+          type="text"
+          placeholder="github.com/owner/repo"
+          [(ngModel)]="repoUrl"
+          (keydown.enter)="onSubmit()"
+        />
+        <button class="render-btn" (click)="onSubmit()" [disabled]="status !== 'idle' || !repoUrl.trim()"
+          [class.fetching]="status === 'fetching'"
+          [class.computing]="status === 'computing'">
+          @switch (status) {
+            @case ('fetching')  { <span class="btn-spinner"></span> Fetching… }
+            @case ('computing') { <span class="btn-spinner"></span> Rendering… }
+            @default            { Render }
+          }
+        </button>
+      </section>
+
+      <!-- Display toggles -->
+      <section class="section">
+        <label class="section-label">Display</label>
+        @for (opt of displayOptions; track opt.key) {
+          <label class="toggle-row">
+            <input type="checkbox" [(ngModel)]="display[opt.key]" (ngModelChange)="onDisplayChange()" />
+            <span>{{ opt.label }}</span>
+          </label>
+        }
+      </section>
+
+      <!-- Layout sliders -->
+      <section class="section">
+        <div class="section-label">
+          Layout
+          <button class="reset-btn" (click)="onReset()" appTooltip="Reset to defaults">↺</button>
+        </div>
+
+        @for (s of sliders; track s.key) {
+          <div class="slider-row">
+            <div class="slider-meta">
+              <span class="slider-label">{{ s.label }}</span>
+              <span class="slider-value">{{ params[s.key] }}</span>
+            </div>
+            <input
+              type="range"
+              [min]="s.min"
+              [max]="s.max"
+              [step]="s.step"
+              [(ngModel)]="params[s.key]"
+              (ngModelChange)="onSliderChange()"
+            />
+          </div>
+        }
+      </section>
+
+    </div>
+  }
+
+</div>

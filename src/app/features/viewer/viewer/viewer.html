@@ -1,0 +1,20 @@
+<div class="viewer-shell">
+
+  <div class="canvas-area">
+    <app-plotly-canvas class="canvas" [result]="result()" [resetCamera]="resetCamera" [display]="display" />
+  </div>
+
+  <aside class="sidebar">
+    <app-controls-panel
+      [status]="status()"
+      (repoSubmit)="onRepoSubmit($event)"
+      (paramsChange)="onParamsChange($event)"
+      (displayChange)="display = $event"
+    />
+  </aside>
+
+  @if (error()) {
+    <div class="error-toast">{{ error() }}</div>
+  }
+
+</div>

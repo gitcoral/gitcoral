@@ -1,1 +1,42 @@
-/* You can add global styles to this file, and also import other style files */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: #0c0e12;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #c8d0e0;
+  overflow: hidden;
+}
+
+app-root {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.orb-tip {
+  position: fixed;
+  background: rgb(107, 114, 135);
+  color: #fff;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+// Plotly internal background override — the SVG .bg rect defaults to white
+.js-plotly-plot .bg {
+  fill: #0c0e12 !important;
+}
+
+.js-plotly-plot {
+  background: #0c0e12;
+}
+

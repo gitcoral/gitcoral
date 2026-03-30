@@ -17,6 +17,7 @@
     "@angular/forms": "^21.2.0",
     "@angular/platform-browser": "^21.2.0",
     "@angular/router": "^21.2.0",
+    "plotly.js-dist-min": "^3.4.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },
@@ -24,6 +25,7 @@
     "@angular/build": "^21.2.5",
     "@angular/cli": "^21.2.5",
     "@angular/compiler-cli": "^21.2.0",
+    "@types/plotly.js-dist-min": "^2.3.4",
     "jsdom": "^28.0.0",
     "prettier": "^3.8.1",
     "typescript": "~5.9.2",
