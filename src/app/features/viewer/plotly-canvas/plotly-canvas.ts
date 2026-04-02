@@ -41,7 +41,9 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
 
   ngOnChanges(changes: SimpleChanges): void {
     if ((changes['result'] || changes['display']) && this.result) {
-      this.render(this.result, !!changes['result']?.previousValue && !this.resetCamera);
+      const onlyDisplayChanged = !changes['result'] && !!changes['display'];
+      const preserveCamera = onlyDisplayChanged || (!!changes['result']?.previousValue && !this.resetCamera);
+      this.render(this.result, preserveCamera);
     }
   }
 

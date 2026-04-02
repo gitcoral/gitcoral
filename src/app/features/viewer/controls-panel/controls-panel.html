@@ -1,7 +1,9 @@
 <div class="panel" [class.collapsed]="collapsed">
 
   <div class="panel-header">
-    <span class="panel-title">CodeOrb</span>
+    @if (!collapsed) {
+      <span class="panel-title">CodeOrb</span>
+    }
     <button class="collapse-btn" (click)="toggleCollapse()">
       {{ collapsed ? '»' : '«' }}
     </button>
