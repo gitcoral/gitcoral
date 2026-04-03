@@ -13,6 +13,16 @@ import { DEFAULT_DISPLAY_OPTIONS, DisplayOptions, LayoutResult, TreeNode } from 
 // Plotly is loaded as a side-effect import; types come from @types/plotly.js-dist-min
 import * as Plotly from 'plotly.js-dist-min';
 
+function extColor(path: string): string {
+  const dot = path.lastIndexOf('.');
+  if (dot < 0 || dot === path.length - 1) return 'hsl(220,15%,55%)'; // no extension
+  const ext = path.slice(dot + 1).toLowerCase();
+  let h = 0;
+  for (let i = 0; i < ext.length; i++) h = (Math.imul(31, h) + ext.charCodeAt(i)) | 0;
+  const hue = Math.abs(h) % 360;
+  return `hsl(${hue},65%,62%)`;
+}
+
 @Component({
   selector: 'app-plotly-canvas',
   templateUrl: './plotly-canvas.html',
@@ -144,7 +154,7 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
         z: files.map(n => n.z),
         marker: {
           size: files.map(n => n.nodeSize),
-          color: 'rgba(190,220,255,0.5)',
+          color: files.map(n => extColor(n.path)),
           line: { width: 0 },
         },
         text: files.map(n =>
