@@ -38,6 +38,10 @@ export class GithubService {
       if (parts.length >= 2) return { owner: parts[0], repo: parts[1].replace(/\.git$/, '') };
     }
 
+    // Short form: owner/repo
+    const short = s.match(/^([\w.-]+)\/([\w.-]+)$/);
+    if (short) return { owner: short[1], repo: short[2] };
+
     return null;
   }
 

@@ -1,4 +1,5 @@
-import { Component, effect, signal, untracked } from '@angular/core';
+import { Component, OnInit, effect, signal, untracked } from '@angular/core';
+import { Router } from '@angular/router';
 
 import { GithubService } from '../../../core/services/github';
 import { LayoutService } from '../../../core/services/layout';
@@ -12,11 +13,12 @@ import { PlotlyCanvas } from '../plotly-canvas/plotly-canvas';
   templateUrl: './viewer.html',
   styleUrl: './viewer.scss',
 })
-export class Viewer {
+export class Viewer implements OnInit {
 
   resetCamera = false;
   display: DisplayOptions = { ...DEFAULT_DISPLAY_OPTIONS };
   status = signal<LoadingState>('idle');
+  initialRepo = '';
 
   get result() { return this.layout.result; }
   get error()  { return this.layout.error; }
@@ -28,6 +30,7 @@ export class Viewer {
   constructor(
     private github: GithubService,
     private layout: LayoutService,
+    private router: Router,
   ) {
     // When layout finishes (result or error changes), go back to idle
     effect(() => {
@@ -37,10 +40,23 @@ export class Viewer {
     });
   }
 
+  ngOnInit(): void {
+    const repo = new URLSearchParams(window.location.search).get('repo');
+    if (repo) {
+      this.initialRepo = repo;
+      this.onRepoSubmit({ url: repo });
+    }
+  }
+
   async onRepoSubmit(event: RepoSubmitEvent): Promise<void> {
     this.layout.error.set(null);
     const parsed = this.github.parseRepoUrl(event.url);
     if (!parsed) { this.layout.error.set('Invalid GitHub URL'); return; }
+
+    this.router.navigate([], {
+      queryParams: { repo: `${parsed.owner}/${parsed.repo}` },
+      replaceUrl: false,
+    });
 
     this.status.set('fetching');
     try {

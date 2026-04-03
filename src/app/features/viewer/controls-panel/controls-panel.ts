@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnDestroy, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, SimpleChanges, OnChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TooltipDirective } from '../../../shared/directives/tooltip.directive';
 import { Subject, debounceTime, takeUntil } from 'rxjs';
@@ -14,9 +14,10 @@ export interface RepoSubmitEvent {
   templateUrl: './controls-panel.html',
   styleUrl: './controls-panel.scss',
 })
-export class ControlsPanel implements OnInit, OnDestroy {
+export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
 
   @Input() status: LoadingState = 'idle';
+  @Input() initialRepo = '';
   @Output() repoSubmit     = new EventEmitter<RepoSubmitEvent>();
   @Output() paramsChange   = new EventEmitter<LayoutParams>();
   @Output() displayChange  = new EventEmitter<DisplayOptions>();
@@ -53,6 +54,12 @@ export class ControlsPanel implements OnInit, OnDestroy {
     this.params$
       .pipe(debounceTime(500), takeUntil(this.destroy$))
       .subscribe(p => this.paramsChange.emit(p));
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['initialRepo'] && this.initialRepo && !this.repoUrl) {
+      this.repoUrl = this.initialRepo;
+    }
   }
 
   ngOnDestroy(): void {

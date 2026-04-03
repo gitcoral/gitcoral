@@ -7,6 +7,7 @@
   <aside class="sidebar">
     <app-controls-panel
       [status]="status()"
+      [initialRepo]="initialRepo"
       (repoSubmit)="onRepoSubmit($event)"
       (paramsChange)="onParamsChange($event)"
       (displayChange)="display = $event"
