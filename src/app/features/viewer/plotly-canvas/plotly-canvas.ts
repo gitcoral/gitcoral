@@ -119,7 +119,8 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
         type: 'scatter3d',
         mode: 'lines',
         x: g.x, y: g.y, z: g.z,
-        line: { color: 'rgba(120,130,145,0.4)', width },
+        opacity: this.display.connectorOpacity,
+        line: { color: 'rgb(120,130,145)', width },
         hoverinfo: 'skip',
         showlegend: false,
       } as Plotly.Data);
