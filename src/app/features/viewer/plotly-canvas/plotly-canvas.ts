@@ -153,7 +153,14 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
         y: files.map(n => n.y),
         z: files.map(n => n.z),
         marker: {
-          size: files.map(n => n.nodeSize),
+          size: (() => {
+            const sizes = files.map(n => n.fileSize ?? 0);
+            const minFs = Math.min(...sizes);
+            const maxFs = Math.max(...sizes);
+            const fsRange = maxFs - minFs || 1;
+            const { dotMin, dotMax } = this.display;
+            return files.map(n => dotMin + (dotMax - dotMin) * ((n.fileSize ?? 0) - minFs) / fsRange);
+          })(),
           color: files.map(n => extColor(n.path)),
           line: { width: 0 },
         },

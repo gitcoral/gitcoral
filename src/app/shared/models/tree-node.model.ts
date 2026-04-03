@@ -35,12 +35,16 @@ export interface DisplayOptions {
   showFolders: boolean;
   showFiles: boolean;
   showConnectors: boolean;
+  dotMin: number;
+  dotMax: number;
 }
 
 export const DEFAULT_DISPLAY_OPTIONS: DisplayOptions = {
   showFolders: true,
   showFiles: true,
   showConnectors: true,
+  dotMin: 2.0,
+  dotMax: 10.0,
 };
 
 export interface LayoutResult {
