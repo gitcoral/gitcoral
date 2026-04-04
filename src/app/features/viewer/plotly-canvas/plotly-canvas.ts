@@ -128,6 +128,11 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
 
     // Folder markers
     if (folders.length) {
+      const sqrtCounts = folders.map(n => Math.sqrt(n.subtreeFiles ?? 1));
+      const sqrtCMin = Math.min(...sqrtCounts);
+      const sqrtCMax = Math.max(...sqrtCounts);
+      const sqrtCRange = sqrtCMax - sqrtCMin || 1;
+      const { dotMin, dotMax } = this.display;
       traces.push({
         type: 'scatter3d',
         mode: 'markers',
@@ -135,9 +140,11 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
         y: folders.map(n => n.y),
         z: folders.map(n => n.z),
         marker: {
-          size: folders.map(n => n.nodeSize),
-          color: 'rgba(100,150,220,0.9)',
-          line: { width: 0.5, color: 'rgba(180,210,255,0.4)' },
+          size: folders.map(n =>
+            dotMin + (dotMax - dotMin) * (Math.sqrt(n.subtreeFiles ?? 1) - sqrtCMin) / sqrtCRange
+          ),
+          color: 'rgba(100,150,220,0.35)',
+          line: { width: 0 },
         },
         text: folders.map(n => `<b>${n.path || '(root)'}</b><extra></extra>`),
         hovertemplate: '%{text}',
@@ -156,11 +163,14 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
         marker: {
           size: (() => {
             const sizes = files.map(n => n.fileSize ?? 0);
-            const minFs = Math.min(...sizes);
-            const maxFs = Math.max(...sizes);
-            const fsRange = maxFs - minFs || 1;
+            const sqrtSizes = sizes.map(s => Math.sqrt(s));
+            const sqrtMin = Math.min(...sqrtSizes);
+            const sqrtMax = Math.max(...sqrtSizes);
+            const sqrtRange = sqrtMax - sqrtMin || 1;
             const { dotMin, dotMax } = this.display;
-            return files.map(n => dotMin + (dotMax - dotMin) * ((n.fileSize ?? 0) - minFs) / fsRange);
+            return files.map(n =>
+              dotMin + (dotMax - dotMin) * (Math.sqrt(n.fileSize ?? 0) - sqrtMin) / sqrtRange
+            );
           })(),
           color: files.map(n => extColor(n.path)),
           line: { width: 0 },
