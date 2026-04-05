@@ -167,6 +167,98 @@ function layoutTree(root: TreeNode, params: LayoutParams): void {
   }
 
   place(root, 0, layerHeight);
+  fixOverlaps(root);
+}
+
+// ---------------------------------------------------------------------------
+// Post-placement: bounding-sphere overlap correction
+// ---------------------------------------------------------------------------
+
+/** Bottom-up bounding radius: max 3-D distance from node to any descendant. */
+function subtreeBoundingRadius(n: TreeNode, cache: Map<TreeNode, number>): number {
+  let r = cache.get(n);
+  if (r !== undefined) return r;
+  r = 0;
+  for (const c of (n.children ?? [])) {
+    const cr  = subtreeBoundingRadius(c, cache);
+    const dx  = c.x - n.x, dy = c.y - n.y, dz = c.z - n.z;
+    const ext = Math.sqrt(dx * dx + dy * dy + dz * dz) + cr;
+    if (ext > r) r = ext;
+  }
+  cache.set(n, r);
+  return r;
+}
+
+/** Translate a whole subtree (root + all descendants) by (dx, dy, dz). */
+function translateSubtree(n: TreeNode, dx: number, dy: number, dz: number): void {
+  const stack: TreeNode[] = [n];
+  while (stack.length) {
+    const node = stack.pop()!;
+    node.x += dx; node.y += dy; node.z += dz;
+    if (node.children) stack.push(...node.children);
+  }
+}
+
+/**
+ * Push overlapping sibling subtrees radially away from their common parent
+ * until no bounding spheres intersect. Runs up to MAX_PASSES iterations to
+ * handle cascading corrections introduced by earlier fixes.
+ *
+ * Skips the root level (depth 0): top-level subtrees have bounding radii that
+ * encompass the whole tree, so correcting them would push first connections to
+ * extreme lengths. The physics sim already handles top-level angular separation.
+ */
+function fixOverlaps(root: TreeNode): void {
+  const MAX_PASSES = 5;
+  const MARGIN     = 1.05; // 5 % safety gap
+
+  for (let pass = 0; pass < MAX_PASSES; pass++) {
+    const cache = new Map<TreeNode, number>();
+    let anyFix  = false;
+
+    // BFS with depth tracking — parents before children
+    const queue: Array<{ n: TreeNode; depth: number }> = [{ n: root, depth: 0 }];
+    while (queue.length) {
+      const { n, depth } = queue.shift()!;
+      const folders = (n.children ?? []).filter(c => !c.isFile);
+
+      // Skip the root level: its children's bounding spheres span the whole tree,
+      // causing massive pushes that distort the first connections.
+      if (depth > 0) {
+        for (let i = 0; i < folders.length; i++) {
+          for (let j = i + 1; j < folders.length; j++) {
+            const ci = folders[i], cj = folders[j];
+            const ri = subtreeBoundingRadius(ci, cache);
+            const rj = subtreeBoundingRadius(cj, cache);
+            const ex = ci.x - cj.x, ey = ci.y - cj.y, ez = ci.z - cj.z;
+            const d  = Math.sqrt(ex * ex + ey * ey + ez * ez);
+            const need = (ri + rj) * MARGIN;
+
+            if (d < need) {
+              // Radial direction from parent to each child
+              const ix = ci.x - n.x, iy = ci.y - n.y, iz = ci.z - n.z;
+              const di = Math.sqrt(ix * ix + iy * iy + iz * iz) || 1;
+              const jx = cj.x - n.x, jy = cj.y - n.y, jz = cj.z - n.z;
+              const dj = Math.sqrt(jx * jx + jy * jy + jz * jz) || 1;
+
+              // Overshoot slightly (0.6 vs 0.5) to converge faster.
+              // Cap at 50 % of child distance so corrections stay proportional.
+              const push = Math.min((need - d) * 0.6, di * 0.5, dj * 0.5);
+              translateSubtree(ci, ix / di * push, iy / di * push, iz / di * push);
+              translateSubtree(cj, jx / dj * push, jy / dj * push, jz / dj * push);
+
+              cache.clear(); // positions changed — invalidate all cached radii
+              anyFix = true;
+            }
+          }
+        }
+      }
+
+      for (const f of folders) queue.push({ n: f, depth: depth + 1 });
+    }
+
+    if (!anyFix) break;
+  }
 }
 
 function maxFileSizeInTree(node: TreeNode): number {

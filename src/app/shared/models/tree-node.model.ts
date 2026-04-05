@@ -26,7 +26,7 @@ export const DEFAULT_LAYOUT_PARAMS: LayoutParams = {
   buoyancy: 2.0,
   repulsion: 1.5,
   decay: 0.82,
-  dotD: 0.02,
+  dotD: 0.06,
 };
 
 export type LoadingState = 'idle' | 'fetching' | 'computing';

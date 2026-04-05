@@ -44,7 +44,7 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
     { key: 'buoyancy',    label: 'Buoyancy',        min: 0.1,  max: 6.0,  step: 0.1  },
     { key: 'repulsion',   label: 'Repulsion',       min: 0.1,  max: 6.0,  step: 0.1  },
     { key: 'decay',       label: 'Decay',           min: 0.3,  max: 0.99, step: 0.01 },
-    { key: 'dotD',        label: 'File dot size',   min: 0.005, max: 0.1, step: 0.005 },
+    { key: 'dotD',        label: 'File dot size',   min: 0.005, max: 0.3, step: 0.005 },
   ];
 
   private params$ = new Subject<LayoutParams>();
