@@ -24,7 +24,7 @@ const HUE_BUCKETS   = 8;
 const W_IN_MIN = 2, W_IN_MAX = 12, W_OUT_MIN = 1, W_OUT_MAX = 5;
 
 // ---------------------------------------------------------------------------
-// Colour helpers — share the same polynomial hash
+// Colour helpers
 // ---------------------------------------------------------------------------
 
 function hashPath(path: string): number {
@@ -33,15 +33,26 @@ function hashPath(path: string): number {
   return Math.abs(h);
 }
 
-function extColor(path: string): string {
-  const dot = path.lastIndexOf('.');
-  if (dot < 0 || dot === path.length - 1) return 'hsl(220,15%,55%)';
-  const hue = hashPath(path.slice(dot + 1).toLowerCase()) % 360;
-  return `hsl(${hue},65%,62%)`;
-}
-
 function folderColor(path: string): string {
   return `hsl(${hashPath(path) % 360},35%,42%)`;
+}
+
+/**
+ * Build a colour map for a set of file extensions weighted by file count.
+ * Extensions are sorted by popularity (most files first) so the golden-ratio
+ * hue sequence spends its most-separated slots on the dominant extensions.
+ * HSL guarantees all colours stay in sRGB gamut.
+ */
+export function buildExtColorMap(extCounts: Map<string, number>): Map<string, string> {
+  const GOLDEN = 0.61803398875;
+  const sorted = [...extCounts.entries()].sort((a, b) => b[1] - a[1]);
+  const map    = new Map<string, string>();
+  sorted.forEach(([ext], i) => {
+    const hue       = Math.round((i * GOLDEN % 1) * 360);
+    const lightness = i % 2 === 0 ? 65 : 75;
+    map.set(ext, `hsl(${hue},80%,${lightness}%)`);
+  });
+  return map;
 }
 
 // ---------------------------------------------------------------------------
@@ -212,6 +223,7 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
     folders: PositionedNode[],
     files: PositionedNode[],
     focusSet: Set<string> | null,
+    extColorFn: (path: string) => string,
   ): Plotly.Data[] {
     const inFocus = (path: string) => !focusSet || focusSet.has(path);
 
@@ -266,7 +278,7 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
 
     if (files.length) {
       const [vFoc, vDim] = split(files);
-      const vColor = (n: PositionedNode) => extColor(n.path);
+      const vColor = (n: PositionedNode) => extColorFn(n.path);
       const vSize  = (n: PositionedNode) => toSize(n.fileSize ?? 0);
       const vText  = (n: PositionedNode) => `<b>${n.path}</b><br>${(n.fileSize ?? 0).toLocaleString()} bytes<extra></extra>`;
       if (vFoc.length) traces.push(makeTrace(vFoc, 1,   'files',     vColor, vSize, vText));
@@ -284,9 +296,24 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
     const focusSet   = this.focusPath ? this.buildFocusSet(nodes, this.focusPath) : null;
     const nodeByPath = new Map<string, PositionedNode>(nodes.map(n => [n.path, n]));
 
+    const extCounts = new Map<string, number>();
+    for (const n of nodes) {
+      if (!n.isFile) continue;
+      const dot = n.path.lastIndexOf('.');
+      if (dot < 0 || dot >= n.path.length - 1) continue;
+      const ext = n.path.slice(dot + 1).toLowerCase();
+      extCounts.set(ext, (extCounts.get(ext) ?? 0) + 1);
+    }
+    const colorMap    = buildExtColorMap(extCounts);
+    const extColorFn  = (path: string) => {
+      const dot = path.lastIndexOf('.');
+      if (dot < 0 || dot === path.length - 1) return '#8892a4';
+      return colorMap.get(path.slice(dot + 1).toLowerCase()) ?? '#8892a4';
+    };
+
     return [
       ...(this.display.showConnectors ? this.buildEdgeTraces(allFolders, nodeByPath, focusSet) : []),
-      ...this.buildMarkerTraces(folders, files, focusSet),
+      ...this.buildMarkerTraces(folders, files, focusSet, extColorFn),
     ];
   }
 
