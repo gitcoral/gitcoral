@@ -1,17 +1,17 @@
 /// <reference lib="webworker" />
 
-import { LayoutParams, TreeNode, WorkerRequest, WorkerResponse } from '../../shared/models/tree-node.model';
+import { LayoutParams, PositionedNode, TreeStructure, WorkerRequest, WorkerResponse } from '../../shared/models/tree-node.model';
 
 // ---------------------------------------------------------------------------
 // Physics simulation — places sibling folders on a unit sphere
 // ---------------------------------------------------------------------------
 
-function simulate(weights: number[], buoy: number, repel: number): Array<[number, number]> {
+export function simulate(weights: number[], buoy: number, repel: number): Array<[number, number]> {
   const N = weights.length;
   if (N === 0) return [];
   if (N === 1) return [[0.0, 0.0]];
 
-  const maxW = Math.max(...weights);
+  const maxW = weights.reduce((m, v) => v > m ? v : m, 0);
   const thetas = new Float64Array(N).fill(Math.PI / 3);
   const phis   = Float64Array.from({ length: N }, (_, i) => i * 2 * Math.PI / N);
 
@@ -83,6 +83,7 @@ function simulate(weights: number[], buoy: number, repel: number): Array<[number
   const EPS = 1e-9;
   return Array.from({ length: N }, (_, i) => [
     thetas[i],
+    // Snap to nearest multiple of π when already effectively there — avoids floating-point drift
     Math.abs(Math.sin(phis[i])) > EPS ? phis[i] : Math.round(phis[i] / Math.PI) * Math.PI,
   ]);
 }
@@ -91,33 +92,74 @@ function simulate(weights: number[], buoy: number, repel: number): Array<[number
 // Layout — top-down recursive placement
 // ---------------------------------------------------------------------------
 
-function layoutTree(root: TreeNode, params: LayoutParams): void {
+// Internal working type: TreeStructure fields + all spatial fields pre-initialised.
+// Built by toLayoutNode() before placement begins — the input TreeStructure is never mutated.
+interface LayoutNode {
+  path: string;
+  isFile: boolean;
+  fileSize?: number;
+  subtreeFiles: number;
+  subtreeBytes: number;
+  children: LayoutNode[];
+  x: number;
+  y: number;
+  z: number;
+  connectionWidth: number;
+  nodeSize: number;
+}
+
+const GOLDEN_F = Math.PI * (3 - Math.sqrt(5)); // golden-angle step for Fibonacci sphere
+const SNAP     = 1e-10;                         // snap near-zero coords to exact zero
+
+function toLayoutNode(src: TreeStructure): LayoutNode {
+  return {
+    path: src.path,
+    isFile: src.isFile,
+    fileSize: src.fileSize,
+    subtreeFiles: src.subtreeFiles,
+    subtreeBytes: src.subtreeBytes,
+    children: src.children.map(toLayoutNode),
+    x: 0, y: 0, z: 0,
+    connectionWidth: 0,
+    nodeSize: 0,
+  };
+}
+
+function flattenLayoutTree(root: LayoutNode): PositionedNode[] {
+  const result: PositionedNode[] = [];
+  const stack: LayoutNode[]      = [root];
+  while (stack.length) {
+    const { children, ...node } = stack.pop()!;
+    result.push(node);
+    stack.push(...children);
+  }
+  return result;
+}
+
+// Takes a TreeStructure, returns a flat PositionedNode[] ready for the renderer.
+export function layoutTree(root: TreeStructure, params: LayoutParams): PositionedNode[] {
   const { layerHeight, zScale, buoyancy, repulsion, decay, dotD } = params;
-  const GOLDEN_F = Math.PI * (3 - Math.sqrt(5));
-  const SNAP = 1e-10;
 
-  root.x = 0; root.y = 0; root.z = 0;
+  const layoutRoot  = toLayoutNode(root);
+  const maxSubtree  = layoutRoot.subtreeFiles ?? 1;
+  const maxFileSize = maxFileSizeInTree(layoutRoot);
 
-  // Pre-compute max subtree for nodeSize and connectionWidth normalisation
-  const maxSubtree = root.subtreeFiles ?? 1;
-  const maxFileSize = maxFileSizeInTree(root);
-
-  function place(n: TreeNode, hintAngle: number, conn: number): void {
+  function place(n: LayoutNode, hintAngle: number, conn: number): void {
     const px = n.x, py = n.y, pz = n.z;
 
-    const folders = (n.children ?? [])
+    const folders = n.children
       .filter(c => !c.isFile)
-      .sort((a, b) => (b.subtreeFiles ?? 0) - (a.subtreeFiles ?? 0));
+      .sort((a, b) => b.subtreeFiles - a.subtreeFiles);
 
-    const coords = simulate(folders.map(f => f.subtreeFiles ?? 1), buoyancy, repulsion);
-    const maxSf  = Math.max(...folders.map(f => f.subtreeFiles ?? 1), 1);
+    const coords = simulate(folders.map(f => f.subtreeFiles), buoyancy, repulsion);
+    const maxSf  = folders.reduce((m, f) => Math.max(m, f.subtreeFiles), 1);
 
     for (let i = 0; i < folders.length; i++) {
       const sf = folders[i];
       const [theta, phi] = coords[i];
       const phiG = (phi + hintAngle) % (2 * Math.PI);
 
-      const scale     = 0.3 + 0.7 * Math.log1p(sf.subtreeFiles ?? 1) / Math.log1p(maxSf);
+      const scale     = 0.3 + 0.7 * Math.log1p(sf.subtreeFiles) / Math.log1p(maxSf);
       const childConn = conn * scale;
       const r = childConn * Math.sin(theta);
       const h = childConn * Math.cos(theta);
@@ -129,23 +171,27 @@ function layoutTree(root: TreeNode, params: LayoutParams): void {
       sf.y = Math.abs(y) < SNAP ? 0 : y;
       sf.z = pz + h * zScale;
 
-      // connectionWidth: log-normalised subtree weight × depth decay → 6 buckets → px
-      const depth      = sf.path.split('/').length;
-      const tSubtree   = Math.log1p(sf.subtreeFiles ?? 1) / Math.log1p(maxSubtree);
-      const tDepth     = 1 / Math.sqrt(depth + 1);
-      const t          = tSubtree * tDepth;
-      const N_BUCKETS  = 6;
-      const bucket     = Math.min(N_BUCKETS - 1, Math.floor(t * N_BUCKETS));
+      // connectionWidth: log-normalised subtree weight × depth penalty → 6 visual buckets.
+      // Stepped (not continuous) so Plotly edge-batching produces fewer distinct trace widths.
+      const depth     = sf.path.split('/').length;
+      const tSubtree  = Math.log1p(sf.subtreeFiles) / Math.log1p(maxSubtree);
+      const tDepth    = 1 / Math.sqrt(depth + 1);
+      const t         = tSubtree * tDepth;
+      const N_BUCKETS = 6;
+      const bucket    = Math.min(N_BUCKETS - 1, Math.floor(t * N_BUCKETS));
       sf.connectionWidth = 2 + (12 - 2) * bucket / (N_BUCKETS - 1);
 
       // nodeSize: log-compressed subtree count
-      sf.nodeSize = Math.max(5, 5 + 4 * Math.min(2, Math.log1p(sf.subtreeFiles ?? 1)));
+      sf.nodeSize = Math.max(5, 5 + 4 * Math.min(2, Math.log1p(sf.subtreeFiles)));
 
-      place(sf, phiG, Math.max(h * decay, layerHeight * 0.15));
+      // h * decay: vertical displacement of this node becomes the sphere radius for its
+      // children — tighter sphere the deeper we go, floored to avoid vanishing connectors.
+      const nextSphereRadius = Math.max(h * decay, layerHeight * 0.15);
+      place(sf, phiG, nextSphereRadius);
     }
 
-    // Files — Fibonacci sphere cloud, radius from sphere surface formula
-    const files = (n.children ?? []).filter(c => c.isFile);
+    // Files — Fibonacci sphere cloud, radius scales with √N to keep visual density stable
+    const files = n.children.filter(c => c.isFile);
     const Nf    = files.length;
     if (Nf > 0) {
       const cloudR = (dotD / 2) * Math.sqrt(Nf);
@@ -158,43 +204,26 @@ function layoutTree(root: TreeNode, params: LayoutParams): void {
         f.y = py + cloudR * sinT * Math.sin(phiF);
         f.z = pz + cloudR * cosT;
 
-        // nodeSize: log-scaled file size
         const sz = f.fileSize ?? 0;
-        f.nodeSize    = 1.5 + 4.5 * Math.log1p(sz) / Math.log1p(Math.max(maxFileSize, 1));
+        f.nodeSize        = 1.5 + 4.5 * Math.log1p(sz) / Math.log1p(Math.max(maxFileSize, 1));
         f.connectionWidth = 0; // files have no connector
       }
     }
   }
 
-  place(root, 0, layerHeight);
+  place(layoutRoot, 0, layerHeight);
+  return flattenLayoutTree(layoutRoot);
 }
 
-function maxFileSizeInTree(node: TreeNode): number {
+function maxFileSizeInTree(node: LayoutNode): number {
   let max = 0;
-  const stack: TreeNode[] = [node];
+  const stack: LayoutNode[] = [node];
   while (stack.length) {
     const n = stack.pop()!;
     if (n.isFile && (n.fileSize ?? 0) > max) max = n.fileSize!;
-    if (n.children) stack.push(...n.children);
+    stack.push(...n.children);
   }
   return max;
-}
-
-// ---------------------------------------------------------------------------
-// Flatten tree → flat array for transfer back to main thread
-// ---------------------------------------------------------------------------
-
-function flatten(root: TreeNode): TreeNode[] {
-  const result: TreeNode[] = [];
-  const stack: TreeNode[]  = [root];
-  while (stack.length) {
-    const n = stack.pop()!;
-    // Strip children before sending — main thread only needs the flat list
-    const { children, ...node } = n;
-    result.push(node as TreeNode);
-    if (children) stack.push(...children);
-  }
-  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -203,10 +232,9 @@ function flatten(root: TreeNode): TreeNode[] {
 
 addEventListener('message', ({ data }: MessageEvent<WorkerRequest>) => {
   try {
-    layoutTree(data.root, data.params);
     const response: WorkerResponse = {
       result: {
-        nodes: flatten(data.root),
+        nodes: layoutTree(data.root, data.params),
         repoName: data.repoName,
       },
     };

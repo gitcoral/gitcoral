@@ -1,15 +1,35 @@
-export interface TreeNode {
+// ---------------------------------------------------------------------------
+// Phase 1 — GitHub fetch output / worker input
+// Children are present; layout fields (x/y/z etc.) are not yet assigned.
+// ---------------------------------------------------------------------------
+export interface TreeStructure {
   path: string;
   isFile: boolean;
+  fileSize?: number;       // bytes, files only
+  subtreeFiles: number;    // used by the layout algorithm for weighting
+  subtreeBytes: number;    // total bytes under this node (folders) or file size (files)
+  children: TreeStructure[];
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2 — Worker output / renderer input
+// Flat array (children stripped); all spatial fields are populated.
+// ---------------------------------------------------------------------------
+export interface PositionedNode {
+  path: string;
+  isFile: boolean;
+  fileSize?: number;
+  subtreeBytes: number;    // total bytes under this node — pre-computed for renderer
   x: number;
   y: number;
   z: number;
-  connectionWidth: number;
+  connectionWidth: number; // 0 for files
   nodeSize: number;
-  fileSize?: number;      // bytes, files only
-  subtreeFiles?: number;  // folders only, used during layout
-  children?: TreeNode[];  // used during layout, not in final output
 }
+
+// ---------------------------------------------------------------------------
+// Shared parameter / option types
+// ---------------------------------------------------------------------------
 
 export interface LayoutParams {
   layerHeight: number;
@@ -52,12 +72,12 @@ export const DEFAULT_DISPLAY_OPTIONS: DisplayOptions = {
 };
 
 export interface LayoutResult {
-  nodes: TreeNode[];
+  nodes: PositionedNode[];
   repoName: string;
 }
 
 export interface WorkerRequest {
-  root: TreeNode;
+  root: TreeStructure;
   params: LayoutParams;
   repoName: string;
 }

@@ -4,13 +4,13 @@ import {
   DEFAULT_LAYOUT_PARAMS,
   LayoutParams,
   LayoutResult,
-  TreeNode,
+  TreeStructure,
   WorkerRequest,
   WorkerResponse,
 } from '../../shared/models/tree-node.model';
 
 interface PendingRequest {
-  root: TreeNode;
+  root: TreeStructure;
   params: LayoutParams;
   repoName: string;
 }
@@ -43,7 +43,7 @@ export class LayoutService implements OnDestroy {
     ).subscribe(req => this.runWorker(req));
   }
 
-  schedule(root: TreeNode, params: LayoutParams = DEFAULT_LAYOUT_PARAMS, repoName = ''): void {
+  schedule(root: TreeStructure, params: LayoutParams = DEFAULT_LAYOUT_PARAMS, repoName = ''): void {
     this.loading.set(true);
     this.request$.next({ root, params, repoName });
   }

@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { TreeNode } from '../../shared/models/tree-node.model';
+import { TreeStructure } from '../../shared/models/tree-node.model';
 
 interface GithubEntry {
   path: string;
@@ -7,12 +7,17 @@ interface GithubEntry {
   size?: number;
 }
 
+interface GithubRepoMeta   { default_branch: string }
+interface GithubCommit     { commit: { tree: { sha: string } } }
+interface GithubTreeResult { tree: GithubEntry[]; truncated: boolean }
+
 interface InternalNode {
   path: string;
   isFile: boolean;
   fileSize: number;
   children: Map<string, InternalNode>;
   subtreeFiles: number;
+  subtreeBytes: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -45,29 +50,29 @@ export class GithubService {
     return null;
   }
 
-  async fetchTree(owner: string, repo: string, token?: string): Promise<TreeNode> {
+  async fetchTree(owner: string, repo: string, token?: string): Promise<TreeStructure> {
     const headers = token
       ? { ...this.HEADERS, Authorization: `Bearer ${token}` }
       : { ...this.HEADERS };
 
     // Step 1: get default branch
-    const meta = await this.get(`${this.BASE}/repos/${owner}/${repo}`, headers);
-    const branch: string = meta.default_branch ?? 'main';
+    const meta   = await this.get<GithubRepoMeta>(`${this.BASE}/repos/${owner}/${repo}`, headers);
+    const branch = meta.default_branch ?? 'main';
 
     // Step 2: get HEAD commit tree SHA
-    const commit = await this.get(
+    const commit  = await this.get<GithubCommit>(
       `${this.BASE}/repos/${owner}/${repo}/commits/${encodeURIComponent(branch)}`,
       headers,
     );
-    const treeSha: string = commit?.commit?.tree?.sha;
+    const treeSha = commit.commit.tree.sha;
     if (!treeSha) throw new Error('Could not resolve tree SHA');
 
     // Step 3: fetch full recursive tree
-    const treeData = await this.get(
+    const treeData = await this.get<GithubTreeResult>(
       `${this.BASE}/repos/${owner}/${repo}/git/trees/${treeSha}?recursive=1`,
       headers,
     );
-    const entries: GithubEntry[] = treeData.tree ?? [];
+    const entries = treeData.tree ?? [];
 
     // Step 4: build internal tree structure
     const root = this.makeNode('', false);
@@ -79,8 +84,8 @@ export class GithubService {
       }
     }
 
-    // Step 5: compute subtree file counts bottom-up
-    this.computeSubtreeFiles(root);
+    // Step 5: compute subtree file counts and byte totals bottom-up
+    this.computeSubtreeStats(root);
 
     // Step 6: flatten to TreeNode (xyz/nodeSize/connectionWidth set to 0 — layout fills them)
     return this.toTreeNode(root);
@@ -90,17 +95,17 @@ export class GithubService {
   // Private helpers
   // -------------------------------------------------------------------------
 
-  private async get(url: string, headers: Record<string, string>): Promise<any> {
+  private async get<T>(url: string, headers: Record<string, string>): Promise<T> {
     const res = await fetch(url, { headers });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       throw new Error(`GitHub API ${res.status}: ${body}`);
     }
-    return res.json();
+    return res.json() as Promise<T>;
   }
 
   private makeNode(path: string, isFile: boolean, fileSize = 0): InternalNode {
-    return { path, isFile, fileSize, children: new Map(), subtreeFiles: 0 };
+    return { path, isFile, fileSize, children: new Map(), subtreeFiles: 0, subtreeBytes: 0 };
   }
 
   private ensurePath(
@@ -128,26 +133,53 @@ export class GithubService {
     }
   }
 
-  private computeSubtreeFiles(node: InternalNode): number {
-    if (node.isFile) { node.subtreeFiles = 1; return 1; }
-    let total = 0;
-    for (const child of node.children.values()) {
-      total += this.computeSubtreeFiles(child);
+  private computeSubtreeStats(root: InternalNode): void {
+    // Collect nodes pre-order, process in reverse = post-order (children before parents)
+    const order: InternalNode[] = [];
+    const stack: InternalNode[] = [root];
+    while (stack.length) {
+      const n = stack.pop()!;
+      order.push(n);
+      for (const child of n.children.values()) stack.push(child);
     }
-    node.subtreeFiles = Math.max(1, total);
-    return node.subtreeFiles;
+    for (let i = order.length - 1; i >= 0; i--) {
+      const n = order[i];
+      if (n.isFile) {
+        n.subtreeFiles = 1;
+        n.subtreeBytes = n.fileSize;
+      } else {
+        let files = 0, bytes = 0;
+        for (const child of n.children.values()) {
+          files += child.subtreeFiles;
+          bytes += child.subtreeBytes;
+        }
+        n.subtreeFiles = Math.max(1, files);
+        n.subtreeBytes = bytes;
+      }
+    }
   }
 
-  private toTreeNode(node: InternalNode): TreeNode {
-    return {
-      path: node.path,
-      isFile: node.isFile,
-      x: 0, y: 0, z: 0,
-      connectionWidth: 0,
-      nodeSize: 0,
-      fileSize: node.isFile ? node.fileSize : undefined,
-      subtreeFiles: node.subtreeFiles,
-      children: [...node.children.values()].map(c => this.toTreeNode(c)),
-    };
+  private toTreeNode(root: InternalNode): TreeStructure {
+    // Collect nodes pre-order, build TreeStructure objects in reverse = post-order
+    const order: InternalNode[] = [];
+    const stack: InternalNode[] = [root];
+    while (stack.length) {
+      const n = stack.pop()!;
+      order.push(n);
+      for (const child of n.children.values()) stack.push(child);
+    }
+    const built = new Map<InternalNode, TreeStructure>();
+    for (let i = order.length - 1; i >= 0; i--) {
+      const n = order[i];
+      built.set(n, {
+        path: n.path,
+        isFile: n.isFile,
+        fileSize: n.isFile ? n.fileSize : undefined,
+        subtreeFiles: n.subtreeFiles,
+        subtreeBytes: n.subtreeBytes,
+        children: [...n.children.values()].map(c => built.get(c)!),
+      });
+    }
+    return built.get(root)!;
   }
 }

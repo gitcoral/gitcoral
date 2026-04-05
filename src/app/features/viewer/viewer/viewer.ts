@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 
 import { GithubService } from '../../../core/services/github';
 import { LayoutService } from '../../../core/services/layout';
-import { DEFAULT_DISPLAY_OPTIONS, DEFAULT_LAYOUT_PARAMS, DisplayOptions, LayoutParams, LoadingState, TreeNode } from '../../../shared/models/tree-node.model';
+import { DEFAULT_DISPLAY_OPTIONS, DEFAULT_LAYOUT_PARAMS, DisplayOptions, LayoutParams, LoadingState, TreeStructure } from '../../../shared/models/tree-node.model';
 import { ControlsPanel, RepoSubmitEvent } from '../controls-panel/controls-panel';
 import { PlotlyCanvas } from '../plotly-canvas/plotly-canvas';
 
@@ -23,7 +23,7 @@ export class Viewer implements OnInit {
   get result() { return this.layout.result; }
   get error()  { return this.layout.error; }
 
-  private rawRoot: TreeNode | null = null;
+  private rawRoot: TreeStructure | null = null;
   private repoName = '';
   private params: LayoutParams = { ...DEFAULT_LAYOUT_PARAMS };
 
