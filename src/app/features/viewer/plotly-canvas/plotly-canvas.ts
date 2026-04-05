@@ -281,7 +281,8 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
   }
 
   private buildLayout(title: string, preserveCamera = false): Partial<Plotly.Layout> {
-    const allFolders = (this.result?.nodes ?? []).filter(n => !n.isFile);
+    const allNodes   = this.result?.nodes ?? [];
+    const allFolders = allNodes.filter(n => !n.isFile);
     const coords     = allFolders.flatMap(n => [Math.abs(n.x), Math.abs(n.y)]);
     const xyMax      = Math.max(...coords, 1) * 1.1;
     const xyRange    = [-xyMax, xyMax];
@@ -290,7 +291,25 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
     const currentCamera = preserveCamera
       ? (this.el as any)?._fullLayout?.scene?.camera
       : null;
-    const camera = currentCamera ?? { eye: { x: 0, y: 2.5, z: 0.5 }, up: { x: 0, y: 0, z: 1 } };
+
+    // Compute initial camera distance from tree bounding box so the full tree
+    // is visible on first load without needing to zoom in.
+    // Plotly eye coords are in normalised scene units where 1 = half the axis range.
+    // We place the eye along +Y at a distance proportional to the largest dimension.
+    let camera = currentCamera;
+    if (!camera) {
+      const xs = allNodes.map(n => n.x);
+      const ys = allNodes.map(n => n.y);
+      const zs = allNodes.map(n => n.z);
+      const spanX = Math.max(...xs) - Math.min(...xs) || 1;
+      const spanY = Math.max(...ys) - Math.min(...ys) || 1;
+      const spanZ = Math.max(...zs) - Math.min(...zs) || 1;
+      const maxSpan = Math.max(spanX, spanY, spanZ);
+      // Normalise against the xy axis range (2*xyMax = full axis width in data units).
+      // eye distance of 1 shows roughly one axis-width; scale so maxSpan fits.
+      const dist = Math.max(1.2, (maxSpan / (2 * xyMax)) * 1.5);
+      camera = { eye: { x: 0, y: dist, z: dist * 0.25 }, up: { x: 0, y: 0, z: 1 } };
+    }
 
     return {
       title: { text: title, font: { color: '#e8eaef' } },
