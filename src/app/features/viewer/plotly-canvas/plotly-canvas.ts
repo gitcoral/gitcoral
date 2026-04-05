@@ -15,12 +15,18 @@ import * as Plotly from 'plotly.js-dist-min';
 
 function extColor(path: string): string {
   const dot = path.lastIndexOf('.');
-  if (dot < 0 || dot === path.length - 1) return 'hsl(220,15%,55%)'; // no extension
+  if (dot < 0 || dot === path.length - 1) return 'hsl(220,15%,55%)';
   const ext = path.slice(dot + 1).toLowerCase();
   let h = 0;
   for (let i = 0; i < ext.length; i++) h = (Math.imul(31, h) + ext.charCodeAt(i)) | 0;
   const hue = Math.abs(h) % 360;
   return `hsl(${hue},65%,62%)`;
+}
+
+function folderColor(path: string): string {
+  let h = 0;
+  for (let i = 0; i < path.length; i++) h = (Math.imul(31, h) + path.charCodeAt(i)) | 0;
+  return `hsl(${Math.abs(h) % 360},35%,42%)`;
 }
 
 @Component({
@@ -40,6 +46,7 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
   }
 
   private resizeObserver!: ResizeObserver;
+  private focusPath: string | null = null;
 
   ngOnInit(): void {
     this.initEmpty();
@@ -47,10 +54,38 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
       Plotly.Plots.resize(this.el);
     });
     this.resizeObserver.observe(this.el);
+    let markerClicked = false;
+    let mouseDownX = 0, mouseDownY = 0;
+
+    this.el.addEventListener('mousedown', (e: MouseEvent) => {
+      mouseDownX = e.clientX;
+      mouseDownY = e.clientY;
+    });
+
+    (this.el as any).on('plotly_click', (data: any) => {
+      const pt = data?.points?.[0];
+      const clicked = pt?.customdata as string | undefined;
+      if (clicked === undefined || clicked === null) return;
+      markerClicked = true;
+      this.focusPath = this.focusPath === clicked ? null : clicked;
+      if (this.result) setTimeout(() => this.render(this.result!, true));
+    });
+
+    this.el.addEventListener('click', (e: MouseEvent) => {
+      const dx = e.clientX - mouseDownX;
+      const dy = e.clientY - mouseDownY;
+      const isDrag = Math.sqrt(dx * dx + dy * dy) > 4;
+      if (!isDrag && !markerClicked && this.focusPath !== null) {
+        this.focusPath = null;
+        if (this.result) setTimeout(() => this.render(this.result!, true));
+      }
+      markerClicked = false;
+    });
   }
 
   ngOnChanges(changes: SimpleChanges): void {
     if ((changes['result'] || changes['display']) && this.result) {
+      if (changes['result']) this.focusPath = null;
       const onlyDisplayChanged = !changes['result'] && !!changes['display'];
       const preserveCamera = onlyDisplayChanged || (!!changes['result']?.previousValue && !this.resetCamera);
       this.render(this.result, preserveCamera);
@@ -60,6 +95,22 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
   ngOnDestroy(): void {
     this.resizeObserver.disconnect();
     Plotly.purge(this.el);
+  }
+
+  // Returns which paths are "in focus": clicked node + its ancestors + all descendants
+  private buildFocusSet(nodes: TreeNode[], focusPath: string): Set<string> {
+    const set = new Set<string>();
+    set.add(focusPath);
+    // Ancestors
+    const parts = focusPath.split('/');
+    for (let i = 1; i < parts.length; i++) set.add(parts.slice(0, i).join('/'));
+    set.add(''); // root always in focus
+    // All descendants (any node whose path starts with focusPath + '/')
+    const prefix = focusPath ? focusPath + '/' : '';
+    for (const n of nodes) {
+      if (prefix === '' || n.path.startsWith(prefix)) set.add(n.path);
+    }
+    return set;
   }
 
   // -------------------------------------------------------------------------
@@ -87,6 +138,10 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
     const allFolders = nodes.filter(n => !n.isFile);
     const folders    = this.display.showFolders ? allFolders : [];
     const files      = this.display.showFiles   ? nodes.filter(n => n.isFile) : [];
+
+    const focusSet = this.focusPath ? this.buildFocusSet(nodes, this.focusPath) : null;
+    const DIM = 0.08; // alpha for out-of-focus nodes
+    const inFocus = (path: string) => !focusSet || focusSet.has(path);
 
     // O(1) parent lookup by path
     const nodeByPath = new Map<string, TreeNode>(nodes.map(n => [n.path, n]));
@@ -135,12 +190,13 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
       const scaledW    = this.display.connectorWidth * (W_OUT_MIN + (W_OUT_MAX - W_OUT_MIN) * (rawW - W_IN_MIN) / (W_IN_MAX - W_IN_MIN));
       const depthBucket = Math.min(Math.floor((node.z - zMin) / zRange * DEPTH_BUCKETS), DEPTH_BUCKETS - 1);
       const depthAlpha  = 0.8 - 0.65 * (depthBucket / (DEPTH_BUCKETS - 1)); // 0.8 → 0.15
+      const focused     = inFocus(node.path) && inFocus(parentPath);
       const hue         = folderHue(node.path);
       const hueBucket   = Math.floor(hue / (360 / HUE_BUCKETS));
       const hueCentre   = hueBucket * (360 / HUE_BUCKETS) + (360 / HUE_BUCKETS) / 2;
-      const key         = `${Math.round(scaledW)}-${hueBucket}-${depthBucket}`;
+      const key         = `${Math.round(scaledW)}-${hueBucket}-${depthBucket}-${focused ? 1 : 0}`;
 
-      if (!edgeGroups.has(key)) edgeGroups.set(key, { x: [], y: [], z: [], depthAlpha, width: scaledW, hue: hueCentre });
+      if (!edgeGroups.has(key)) edgeGroups.set(key, { x: [], y: [], z: [], depthAlpha: focused ? depthAlpha : DIM, width: scaledW, hue: hueCentre });
       const g = edgeGroups.get(key)!;
       g.x.push(parent.x, node.x, NaN);
       g.y.push(parent.y, node.y, NaN);
@@ -175,48 +231,50 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
     const toSize = (bytes: number) =>
       dotMin + (dotMax - dotMin) * (Math.cbrt(bytes) - cbrtMin) / cbrtRange;
 
-    // Folder markers
-    if (folders.length) {
+    // Helper to push a marker trace for a subset of nodes
+    const pushMarkers = (subset: TreeNode[], opacity: number, name: string, color: (n: TreeNode) => string, sizeOf: (n: TreeNode) => number, textOf: (n: TreeNode) => string) => {
+      if (!subset.length) return;
       traces.push({
         type: 'scatter3d',
         mode: 'markers',
-        x: folders.map(n => n.x),
-        y: folders.map(n => n.y),
-        z: folders.map(n => n.z),
+        x: subset.map(n => n.x),
+        y: subset.map(n => n.y),
+        z: subset.map(n => n.z),
+        opacity,
         marker: {
-          size: folders.map(n => toSize(subtreeSize.get(n.path) ?? 1)),
-          color: folders.map(n => {
-            let h = 0;
-            for (let i = 0; i < n.path.length; i++) h = (Math.imul(31, h) + n.path.charCodeAt(i)) | 0;
-            return `hsla(${Math.abs(h) % 360},35%,42%,0.5)`;
-          }),
+          size: subset.map(sizeOf),
+          color: subset.map(color),
           line: { width: 0 },
         },
-        text: folders.map(n => `<b>${n.path || '(root)'}</b><extra></extra>`),
+        customdata: subset.map(n => n.path),
+        text: subset.map(textOf),
         hovertemplate: '%{text}',
-        name: 'folders',
+        name,
       } as Plotly.Data);
+    };
+
+    // Folder markers — split into focused/dimmed so trace-level opacity works
+    if (folders.length) {
+      const [fFoc, fDim] = focusSet
+        ? [folders.filter(n => inFocus(n.path)), folders.filter(n => !inFocus(n.path))]
+        : [folders, []];
+      const fColor = (n: TreeNode) => folderColor(n.path);
+      const fSize  = (n: TreeNode) => toSize(subtreeSize.get(n.path) ?? 1);
+      const fText  = (n: TreeNode) => `<b>${n.path || '(root)'}</b><extra></extra>`;
+      pushMarkers(fFoc, 1,   'folders',     fColor, fSize, fText);
+      pushMarkers(fDim, DIM, 'folders-dim', fColor, fSize, fText);
     }
 
-    // File markers
+    // File markers — split into focused/dimmed
     if (files.length) {
-      traces.push({
-        type: 'scatter3d',
-        mode: 'markers',
-        x: files.map(n => n.x),
-        y: files.map(n => n.y),
-        z: files.map(n => n.z),
-        marker: {
-          size: files.map(n => toSize(n.fileSize ?? 0)),
-          color: files.map(n => extColor(n.path)),
-          line: { width: 0 },
-        },
-        text: files.map(n =>
-          `<b>${n.path}</b><br>${(n.fileSize ?? 0).toLocaleString()} bytes<extra></extra>`
-        ),
-        hovertemplate: '%{text}',
-        name: 'files',
-      } as Plotly.Data);
+      const [vFoc, vDim] = focusSet
+        ? [files.filter(n => inFocus(n.path)), files.filter(n => !inFocus(n.path))]
+        : [files, []];
+      const vColor = (n: TreeNode) => extColor(n.path);
+      const vSize  = (n: TreeNode) => toSize(n.fileSize ?? 0);
+      const vText  = (n: TreeNode) => `<b>${n.path}</b><br>${(n.fileSize ?? 0).toLocaleString()} bytes<extra></extra>`;
+      pushMarkers(vFoc, 1,   'files',     vColor, vSize, vText);
+      pushMarkers(vDim, DIM, 'files-dim', vColor, vSize, vText);
     }
 
     return traces;

@@ -176,6 +176,13 @@ $accent:    #4a90d9;
   input[type='checkbox'] { accent-color: $accent; cursor: pointer; }
 }
 
+.hint {
+  font-size: 11px;
+  color: $text-dim;
+  margin: 0;
+  line-height: 1.5;
+}
+
 .toggle-hint {
   font-size: 11px;
   color: $text-dim;
