@@ -36,6 +36,7 @@ export interface DisplayOptions {
   showFiles: boolean;
   showConnectors: boolean;
   connectorOpacity: number;
+  connectorWidth: number;
   dotMin: number;
   dotMax: number;
 }
@@ -44,7 +45,8 @@ export const DEFAULT_DISPLAY_OPTIONS: DisplayOptions = {
   showFolders: false,
   showFiles: true,
   showConnectors: true,
-  connectorOpacity: 0.4,
+  connectorOpacity: 0.8,
+  connectorWidth: 3.0,
   dotMin: 4.0,
   dotMax: 20.0,
 };
