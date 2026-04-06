@@ -62,7 +62,9 @@ const VERT = /* glsl */`
     vColor = aColor;
     vec4 mv      = modelViewMatrix * vec4(position, 1.0);
     gl_PointSize = aSize * uPixelRatio;
-    gl_Position  = projectionMatrix * mv;
+    vec4 clip    = projectionMatrix * mv;
+    clip.z      -= 0.002 * clip.w; // bias toward camera so markers win depth test over connectors
+    gl_Position  = clip;
   }
 `;
 
@@ -383,17 +385,15 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
       b.col.push(c.r, c.g, c.b, c.r, c.g, c.b);
     }
 
-    for (const [, { pos, col, depthAlpha, width }] of batches) {
-      const opacity  = this.display.connectorOpacity * depthAlpha;
+    for (const [, { pos, col, width }] of batches) {
       const geo      = new LineSegmentsGeometry();
       geo.setPositions(pos);
       geo.setColors(col);
       const mat = new LineMaterial({
         vertexColors: true,
-        transparent:  true,
-        opacity,
+        transparent:  false,
         linewidth:    width,
-        depthWrite:   false,
+        depthWrite:   true,
         resolution:   new THREE.Vector2(canvas.clientWidth, canvas.clientHeight),
         worldUnits:   false,
       });
@@ -490,27 +490,45 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
   private raycast(event: MouseEvent): PositionedNode | null {
     const canvas = this.canvasRef.nativeElement;
     const rect   = canvas.getBoundingClientRect();
-    const ndc    = new THREE.Vector2(
-       ((event.clientX - rect.left)  / rect.width)  * 2 - 1,
-      -((event.clientY - rect.top)   / rect.height) * 2 + 1,
-    );
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    const W = rect.width;
+    const H = rect.height;
 
-    const raycaster = new THREE.Raycaster();
-    // Scale threshold with camera distance so picking works at any zoom level
-    const camDist = this.camera.position.distanceTo(this.controls.target);
-    raycaster.params.Points!.threshold = camDist * 0.012;
-    raycaster.setFromCamera(ndc, this.camera);
-
-    let closest: { dist: number; node: PositionedNode } | null = null;
+    // Screen-space hit test: project each point to CSS pixels and check radius.
+    // This is correct for billboard points whose visual size is fixed in pixels
+    // regardless of camera distance, unlike a world-space raycaster threshold.
+    let closest: { depth: number; node: PositionedNode } | null = null;
+    const proj = new THREE.Vector3();
 
     for (const obj of this.sceneObjects) {
       if (!(obj instanceof THREE.Points)) continue;
-      const hits = raycaster.intersectObject(obj);
-      if (!hits.length) continue;
-      const hit   = hits[0];
-      const nodes = obj.geometry.userData['nodes'] as PositionedNode[];
-      const node  = nodes[hit.index!];
-      if (!closest || hit.distance < closest.dist) closest = { dist: hit.distance, node };
+      const nodes   = obj.geometry.userData['nodes'] as PositionedNode[];
+      const posAttr = obj.geometry.getAttribute('position') as THREE.BufferAttribute;
+      const sizAttr = obj.geometry.getAttribute('aSize')    as THREE.BufferAttribute;
+
+      for (let i = 0; i < nodes.length; i++) {
+        proj.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
+        proj.project(this.camera); // → NDC
+
+        if (proj.z > 1) continue; // behind near/far clip
+
+        // NDC → CSS pixels
+        const sx = (proj.x + 1) / 2 * W;
+        const sy = (-proj.y + 1) / 2 * H;
+
+        const dx = mouseX - sx;
+        const dy = mouseY - sy;
+
+        // aSize is the point diameter in CSS pixels (gl_PointSize = aSize * devicePixelRatio)
+        const radius = sizAttr.getX(i) / 2;
+        if (dx * dx + dy * dy > radius * radius) continue;
+
+        // Among overlapping points pick the one closest to camera (smallest NDC z)
+        if (!closest || proj.z < closest.depth) {
+          closest = { depth: proj.z, node: nodes[i] };
+        }
+      }
     }
 
     return closest?.node ?? null;
