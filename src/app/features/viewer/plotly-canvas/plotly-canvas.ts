@@ -9,22 +9,21 @@ import {
   ViewChild,
 } from '@angular/core';
 import { DEFAULT_DISPLAY_OPTIONS, DisplayOptions, LayoutResult, PositionedNode } from '../../../shared/models/tree-node.model';
-
-// Plotly is loaded as a side-effect import; types come from @types/plotly.js-dist-min
-import * as Plotly from 'plotly.js-dist-min';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const DIM           = 0.08; // opacity for out-of-focus nodes
-const DEPTH_BUCKETS = 5;
-const HUE_BUCKETS   = 8;
-// Connector width: map layout's 2–12px range down to 1–5px for Plotly
-const W_IN_MIN = 2, W_IN_MAX = 12, W_OUT_MIN = 1, W_OUT_MAX = 5;
+const DIM = 0.08;
+const BG  = new THREE.Color(0x0c0e12);
 
 // ---------------------------------------------------------------------------
-// Colour helpers
+// Colour helpers  (same logic as before)
 // ---------------------------------------------------------------------------
 
 function hashPath(path: string): number {
@@ -33,27 +32,54 @@ function hashPath(path: string): number {
   return Math.abs(h);
 }
 
-function folderColor(path: string): string {
-  return `hsl(${hashPath(path) % 360},35%,42%)`;
+function folderColor(path: string): THREE.Color {
+  return new THREE.Color(`hsl(${hashPath(path) % 360},35%,42%)`);
 }
 
-/**
- * Build a colour map for a set of file extensions weighted by file count.
- * Extensions are sorted by popularity (most files first) so the golden-ratio
- * hue sequence spends its most-separated slots on the dominant extensions.
- * HSL guarantees all colours stay in sRGB gamut.
- */
-export function buildExtColorMap(extCounts: Map<string, number>): Map<string, string> {
+export function buildExtColorMap(extCounts: Map<string, number>): Map<string, THREE.Color> {
   const GOLDEN = 0.61803398875;
   const sorted = [...extCounts.entries()].sort((a, b) => b[1] - a[1]);
-  const map    = new Map<string, string>();
+  const map    = new Map<string, THREE.Color>();
   sorted.forEach(([ext], i) => {
     const hue       = Math.round((i * GOLDEN % 1) * 360);
     const lightness = i % 2 === 0 ? 65 : 75;
-    map.set(ext, `hsl(${hue},80%,${lightness}%)`);
+    map.set(ext, new THREE.Color(`hsl(${hue},80%,${lightness}%)`));
   });
   return map;
 }
+
+// ---------------------------------------------------------------------------
+// Shaders for circular points with per-vertex size and colour
+// ---------------------------------------------------------------------------
+
+const VERT = /* glsl */`
+  attribute float aSize;
+  attribute vec3  aColor;
+  varying   vec3  vColor;
+  uniform   float uPixelRatio;
+
+  void main() {
+    vColor = aColor;
+    vec4 mv      = modelViewMatrix * vec4(position, 1.0);
+    gl_PointSize = aSize * uPixelRatio;
+    gl_Position  = projectionMatrix * mv;
+  }
+`;
+
+const FRAG = /* glsl */`
+  uniform float uOpacity;
+  varying vec3  vColor;
+
+  void main() {
+    // Circular disc with soft edge
+    vec2  uv = gl_PointCoord - vec2(0.5);
+    float r  = dot(uv, uv);
+    if (r > 0.25) discard;
+    float alpha = (1.0 - smoothstep(0.18, 0.25, r)) * uOpacity;
+    gl_FragColor = vec4(vColor, alpha);
+    #include <colorspace_fragment>
+  }
+`;
 
 // ---------------------------------------------------------------------------
 // Component
@@ -61,241 +87,165 @@ export function buildExtColorMap(extCounts: Map<string, number>): Map<string, st
 
 @Component({
   selector: 'app-plotly-canvas',
-  templateUrl: './plotly-canvas.html',
-  styleUrl: './plotly-canvas.scss',
+  template: `<canvas #canvas style="display:block;width:100%;height:100%;"></canvas>`,
+  styles: [`:host { display: block; width: 100%; height: 100%; background: #0c0e12; }`],
 })
 export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
 
   @Input() result: LayoutResult | null = null;
   @Input() resetCamera = false;
   @Input() display: DisplayOptions = { ...DEFAULT_DISPLAY_OPTIONS };
-  @ViewChild('container', { static: true }) containerRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('canvas', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
 
-  private get el(): HTMLDivElement {
-    return this.containerRef.nativeElement;
-  }
-
+  private renderer!: THREE.WebGLRenderer;
+  private scene!: THREE.Scene;
+  private camera!: THREE.PerspectiveCamera;
+  private controls!: OrbitControls;
+  private rafId = 0;
   private resizeObserver!: ResizeObserver;
   private focusPath: string | null = null;
 
+  // Scene objects — replaced on each rebuildScene()
+  private sceneObjects: THREE.Object3D[] = [];
+
+  // Tooltip
+  private tipEl!: HTMLDivElement;
+  private colorOf: ((n: PositionedNode) => THREE.Color) = () => new THREE.Color('#8892a4');
+
+  // Drag detection
+  private mouseDownX = 0;
+  private mouseDownY = 0;
+
+  // Bound event handlers (needed for removeEventListener)
+  private readonly onMouseMove  = this._onMouseMove.bind(this);
+  private readonly onMouseLeave = this._onMouseLeave.bind(this);
+  private readonly onMouseDown  = this._onMouseDown.bind(this);
+  private readonly onClick      = this._onClick.bind(this);
+
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
+
   ngOnInit(): void {
-    this.initEmpty();
-    this.resizeObserver = new ResizeObserver(() => {
-      Plotly.Plots.resize(this.el);
-    });
-    this.resizeObserver.observe(this.el);
-    let markerClicked = false;
-    let mouseDownX = 0, mouseDownY = 0;
+    this.initThree();
+    this.startLoop();
 
-    this.el.addEventListener('mousedown', (e: MouseEvent) => {
-      mouseDownX = e.clientX;
-      mouseDownY = e.clientY;
-    });
+    this.resizeObserver = new ResizeObserver(() => this.onResize());
+    this.resizeObserver.observe(this.canvasRef.nativeElement);
 
-    (this.el as any).on('plotly_click', (data: any) => {
-      const pt = data?.points?.[0];
-      const clicked = pt?.customdata as string | undefined;
-      if (clicked === undefined || clicked === null) return;
-      markerClicked = true;
-      this.focusPath = this.focusPath === clicked ? null : clicked;
-      if (this.result) setTimeout(() => this.render(this.result!, true));
-    });
+    this.tipEl = document.createElement('div');
+    this.tipEl.className = 'orb-tip';
+    this.tipEl.style.cssText = 'position:fixed;pointer-events:none;display:none;';
+    document.body.appendChild(this.tipEl);
 
-    this.el.addEventListener('click', (e: MouseEvent) => {
-      const dx = e.clientX - mouseDownX;
-      const dy = e.clientY - mouseDownY;
-      const isDrag = Math.sqrt(dx * dx + dy * dy) > 4;
-      if (!isDrag && !markerClicked && this.focusPath !== null) {
-        this.focusPath = null;
-        if (this.result) setTimeout(() => this.render(this.result!, true));
-      }
-      markerClicked = false;
-    });
+    const c = this.canvasRef.nativeElement;
+    c.addEventListener('mousemove',  this.onMouseMove);
+    c.addEventListener('mouseleave', this.onMouseLeave);
+    c.addEventListener('mousedown',  this.onMouseDown);
+    c.addEventListener('click',      this.onClick);
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if ((changes['result'] || changes['display']) && this.result) {
-      if (changes['result']) this.focusPath = null;
-      const onlyDisplayChanged = !changes['result'] && !!changes['display'];
-      const preserveCamera = onlyDisplayChanged || (!!changes['result']?.previousValue && !this.resetCamera);
-      this.render(this.result, preserveCamera);
+    if (!this.renderer) return;
+    if (changes['result']) {
+      this.focusPath = null;
+      this.rebuildScene();
+      // Always fit on new result — resetCamera=false only suppresses it on param tweaks
+      const isFirstLoad = !changes['result'].previousValue;
+      if (this.resetCamera || isFirstLoad) requestAnimationFrame(() => this.fitCamera());
+    } else if (changes['display']) {
+      this.rebuildScene();
     }
   }
 
   ngOnDestroy(): void {
+    cancelAnimationFrame(this.rafId);
     this.resizeObserver.disconnect();
-    Plotly.purge(this.el);
+    this.tipEl.remove();
+    this.controls.dispose();
+    this.renderer.dispose();
+    const c = this.canvasRef.nativeElement;
+    c.removeEventListener('mousemove',  this.onMouseMove);
+    c.removeEventListener('mouseleave', this.onMouseLeave);
+    c.removeEventListener('mousedown',  this.onMouseDown);
+    c.removeEventListener('click',      this.onClick);
   }
 
-  // Returns which paths are "in focus": clicked node + its ancestors + all descendants
-  private buildFocusSet(nodes: PositionedNode[], focusPath: string): Set<string> {
-    const set = new Set<string>();
-    set.add(focusPath);
-    // Ancestors
-    const parts = focusPath.split('/');
-    for (let i = 1; i < parts.length; i++) set.add(parts.slice(0, i).join('/'));
-    set.add(''); // root always in focus
-    // All descendants (any node whose path starts with focusPath + '/')
-    const prefix = focusPath ? focusPath + '/' : '';
-    for (const n of nodes) {
-      if (prefix === '' || n.path.startsWith(prefix)) set.add(n.path);
-    }
-    return set;
+  // ---------------------------------------------------------------------------
+  // Three.js setup
+  // ---------------------------------------------------------------------------
+
+  private initThree(): void {
+    const canvas = this.canvasRef.nativeElement;
+    const w = canvas.clientWidth  || 800;
+    const h = canvas.clientHeight || 600;
+
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    this.renderer.setPixelRatio(devicePixelRatio);
+    this.renderer.setSize(w, h, false);
+
+    this.scene = new THREE.Scene();
+    this.scene.background = BG;
+
+    this.camera = new THREE.PerspectiveCamera(60, w / h, 0.01, 2000);
+    this.camera.position.set(0, 15, 5);
+
+    this.controls = new OrbitControls(this.camera, canvas);
+    this.controls.enableDamping  = true;
+    this.controls.dampingFactor  = 0.08;
+    this.controls.screenSpacePanning = false;
   }
 
-  // -------------------------------------------------------------------------
-  // Rendering pipeline
-  // -------------------------------------------------------------------------
-
-  private initEmpty(): void {
-    Plotly.newPlot(this.el, [], this.buildLayout(''), {
-      scrollZoom: true,
-      displaylogo: false,
-      responsive: true,
-    });
+  private startLoop(): void {
+    const loop = () => {
+      this.rafId = requestAnimationFrame(loop);
+      this.controls.update();
+      this.renderer.render(this.scene, this.camera);
+    };
+    loop();
   }
 
-  private render(result: LayoutResult, preserveCamera = false): void {
-    const traces = this.buildTraces(result.nodes);
-    Plotly.react(this.el, traces, this.buildLayout(result.repoName, preserveCamera), {
-      scrollZoom: true,
-      displaylogo: false,
-      responsive: true,
-    });
-  }
-
-  /** One line-trace per (width × hue × depth × focus) bucket — batches edges for Plotly. */
-  private buildEdgeTraces(
-    allFolders: PositionedNode[],
-    nodeByPath: Map<string, PositionedNode>,
-    focusSet: Set<string> | null,
-  ): Plotly.Data[] {
-    const inFocus = (path: string) => !focusSet || focusSet.has(path);
-
-    const zValues = allFolders.map(n => n.z);
-    const zMin    = Math.min(...zValues, 0);
-    const zMax    = Math.max(...zValues, 1);
-    const zRange  = zMax - zMin || 1;
-
-    type EdgeGroup = { x: number[]; y: number[]; z: number[]; depthAlpha: number; width: number; hue: number };
-    const groups = new Map<string, EdgeGroup>();
-
-    for (const node of allFolders) {
-      if (!node.path) continue; // root has no parent edge
-      const parentPath = node.path.includes('/')
-        ? node.path.substring(0, node.path.lastIndexOf('/'))
-        : '';
-      const parent = nodeByPath.get(parentPath);
-      if (!parent) continue;
-
-      const scaledW     = this.display.connectorWidth *
-        (W_OUT_MIN + (W_OUT_MAX - W_OUT_MIN) * (node.connectionWidth - W_IN_MIN) / (W_IN_MAX - W_IN_MIN));
-      const depthBucket = Math.min(Math.floor((node.z - zMin) / zRange * DEPTH_BUCKETS), DEPTH_BUCKETS - 1);
-      const depthAlpha  = 0.8 - 0.65 * (depthBucket / (DEPTH_BUCKETS - 1)); // 0.8 → 0.15
-      const focused     = inFocus(node.path) && inFocus(parentPath);
-      const hue         = hashPath(node.path) % 360;
-      const hueBucket   = Math.floor(hue / (360 / HUE_BUCKETS));
-      const hueCentre   = hueBucket * (360 / HUE_BUCKETS) + (360 / HUE_BUCKETS) / 2;
-      const key         = `${Math.round(scaledW)}-${hueBucket}-${depthBucket}-${focused ? 1 : 0}`;
-
-      if (!groups.has(key)) {
-        groups.set(key, { x: [], y: [], z: [], depthAlpha: focused ? depthAlpha : DIM, width: scaledW, hue: hueCentre });
+  private onResize(): void {
+    const c = this.canvasRef.nativeElement;
+    const w = c.clientWidth;
+    const h = c.clientHeight;
+    if (!w || !h) return;
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(w, h, false);
+    for (const obj of this.sceneObjects) {
+      if (obj instanceof THREE.Points) {
+        const mat = obj.material as THREE.ShaderMaterial;
+        if (mat.uniforms['uPixelRatio']) mat.uniforms['uPixelRatio'].value = devicePixelRatio;
       }
-      const g = groups.get(key)!;
-      g.x.push(parent.x, node.x, NaN);
-      g.y.push(parent.y, node.y, NaN);
-      g.z.push(parent.z, node.z, NaN);
+      if (obj instanceof LineSegments2) {
+        (obj.material as LineMaterial).resolution.set(w, h);
+      }
     }
-
-    return [...groups.values()].map(g => ({
-      type: 'scatter3d',
-      mode: 'lines',
-      x: g.x, y: g.y, z: g.z,
-      opacity: this.display.connectorOpacity * g.depthAlpha,
-      line: { color: `hsl(${g.hue},20%,60%)`, width: g.width },
-      hoverinfo: 'skip',
-      showlegend: false,
-    } as Plotly.Data));
   }
 
-  /** Scatter3d marker traces for folders and files, split into focused/dimmed pairs. */
-  private buildMarkerTraces(
-    folders: PositionedNode[],
-    files: PositionedNode[],
-    focusSet: Set<string> | null,
-    extColorFn: (path: string) => string,
-  ): Plotly.Data[] {
-    const inFocus = (path: string) => !focusSet || focusSet.has(path);
+  // ---------------------------------------------------------------------------
+  // Scene construction
+  // ---------------------------------------------------------------------------
 
-    // Shared cbrt scale across files and folders so sizes are visually comparable.
-    // Plotly marker.size is diameter in pixels → volume ∝ d³ → d ∝ bytes^(1/3)
-    const { dotMin, dotMax } = this.display;
-    const allCbrt   = [
-      ...folders.map(n => Math.cbrt(n.subtreeBytes)),
-      ...files.map(n => Math.cbrt(n.fileSize ?? 0)),
-    ];
-    const cbrtMin   = Math.min(...allCbrt);
-    const cbrtMax   = Math.max(...allCbrt);
-    const cbrtRange = cbrtMax - cbrtMin || 1;
-    const toSize    = (bytes: number) =>
-      dotMin + (dotMax - dotMin) * (Math.cbrt(bytes) - cbrtMin) / cbrtRange;
-
-    const split = (nodes: PositionedNode[]) => focusSet
-      ? [nodes.filter(n =>  inFocus(n.path)), nodes.filter(n => !inFocus(n.path))] as const
-      : [nodes, [] as PositionedNode[]] as const;
-
-    const makeTrace = (
-      subset: PositionedNode[],
-      opacity: number,
-      name: string,
-      color: (n: PositionedNode) => string,
-      sizeOf: (n: PositionedNode) => number,
-      textOf: (n: PositionedNode) => string,
-    ): Plotly.Data => ({
-      type: 'scatter3d',
-      mode: 'markers',
-      x: subset.map(n => n.x),
-      y: subset.map(n => n.y),
-      z: subset.map(n => n.z),
-      opacity,
-      marker: { size: subset.map(sizeOf), color: subset.map(color), line: { width: 0 } },
-      customdata: subset.map(n => n.path),
-      text: subset.map(textOf),
-      hovertemplate: '%{text}',
-      name,
-    } as Plotly.Data);
-
-    const traces: Plotly.Data[] = [];
-
-    if (folders.length) {
-      const [fFoc, fDim] = split(folders);
-      const fColor = (n: PositionedNode) => folderColor(n.path);
-      const fSize  = (n: PositionedNode) => toSize(n.subtreeBytes);
-      const fText  = (n: PositionedNode) => `<b>${n.path || '(root)'}</b><extra></extra>`;
-      if (fFoc.length) traces.push(makeTrace(fFoc, 1,   'folders',     fColor, fSize, fText));
-      if (fDim.length) traces.push(makeTrace(fDim, DIM, 'folders-dim', fColor, fSize, fText));
+  private rebuildScene(): void {
+    // Remove and dispose previous scene objects
+    for (const obj of this.sceneObjects) {
+      this.scene.remove(obj);
+      if (obj instanceof THREE.Points || obj instanceof THREE.LineSegments || obj instanceof LineSegments2) {
+        (obj as any).geometry.dispose();
+        const mat = (obj as any).material;
+        if (Array.isArray(mat)) mat.forEach((m: any) => m.dispose()); else mat.dispose();
+      }
     }
+    this.sceneObjects = [];
 
-    if (files.length) {
-      const [vFoc, vDim] = split(files);
-      const vColor = (n: PositionedNode) => extColorFn(n.path);
-      const vSize  = (n: PositionedNode) => toSize(n.fileSize ?? 0);
-      const vText  = (n: PositionedNode) => `<b>${n.path}</b><br>${(n.fileSize ?? 0).toLocaleString()} bytes<extra></extra>`;
-      if (vFoc.length) traces.push(makeTrace(vFoc, 1,   'files',     vColor, vSize, vText));
-      if (vDim.length) traces.push(makeTrace(vDim, DIM, 'files-dim', vColor, vSize, vText));
-    }
+    if (!this.result) return;
+    const nodes    = this.result.nodes;
+    const focusSet = this.focusPath ? this.buildFocusSet(nodes, this.focusPath) : null;
+    const inFocus  = (path: string) => !focusSet || focusSet.has(path);
 
-    return traces;
-  }
-
-  /** Orchestrates the three trace-building steps. */
-  private buildTraces(nodes: PositionedNode[]): Plotly.Data[] {
-    const allFolders = nodes.filter(n => !n.isFile);
-    const folders    = this.display.showFolders ? allFolders : [];
-    const files      = this.display.showFiles   ? nodes.filter(n => n.isFile) : [];
-    const focusSet   = this.focusPath ? this.buildFocusSet(nodes, this.focusPath) : null;
-    const nodeByPath = new Map<string, PositionedNode>(nodes.map(n => [n.path, n]));
-
+    // Colour map
     const extCounts = new Map<string, number>();
     for (const n of nodes) {
       if (!n.isFile) continue;
@@ -304,87 +254,313 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
       const ext = n.path.slice(dot + 1).toLowerCase();
       extCounts.set(ext, (extCounts.get(ext) ?? 0) + 1);
     }
-    const colorMap    = buildExtColorMap(extCounts);
-    const extColorFn  = (path: string) => {
-      const dot = path.lastIndexOf('.');
-      if (dot < 0 || dot === path.length - 1) return '#8892a4';
-      return colorMap.get(path.slice(dot + 1).toLowerCase()) ?? '#8892a4';
+    const colorMap = buildExtColorMap(extCounts);
+    this.colorOf   = (n: PositionedNode): THREE.Color => {
+      if (!n.isFile) return folderColor(n.path);
+      const dot = n.path.lastIndexOf('.');
+      if (dot < 0 || dot === n.path.length - 1) return new THREE.Color('#8892a4');
+      return colorMap.get(n.path.slice(dot + 1).toLowerCase()) ?? new THREE.Color('#8892a4');
     };
+    const colorOf = this.colorOf;
 
-    return [
-      ...(this.display.showConnectors ? this.buildEdgeTraces(allFolders, nodeByPath, focusSet) : []),
-      ...this.buildMarkerTraces(folders, files, focusSet, extColorFn),
+    // Visible node list
+    const visible: PositionedNode[] = [
+      ...(this.display.showFolders ? nodes.filter(n => !n.isFile) : []),
+      ...(this.display.showFiles   ? nodes.filter(n =>  n.isFile) : []),
     ];
+    // Size scale (cbrt, shared across folders+files)
+    const { dotMin, dotMax } = this.display;
+    const cbrtAll   = visible.map(n => Math.cbrt(n.isFile ? (n.fileSize ?? 0) : n.subtreeBytes));
+    const cbrtMin   = Math.min(...cbrtAll, 0);
+    const cbrtMax   = Math.max(...cbrtAll, 1);
+    const cbrtRange = cbrtMax - cbrtMin || 1;
+    const toSize    = (bytes: number) =>
+      dotMin + (dotMax - dotMin) * (Math.cbrt(bytes) - cbrtMin) / cbrtRange;
+
+    // Split focused / dimmed
+    const focused = focusSet ? visible.filter(n =>  inFocus(n.path)) : visible;
+    const dimmed  = focusSet ? visible.filter(n => !inFocus(n.path)) : [];
+
+    if (focused.length) this.addPoints(focused, 1.0, colorOf, toSize);
+    if (dimmed.length)  this.addPoints(dimmed,  DIM, colorOf, toSize);
+
+    // Edges
+    if (this.display.showConnectors) {
+      const allFolders = nodes.filter(n => !n.isFile);
+      const nodeByPath = new Map(nodes.map(n => [n.path, n]));
+      this.addEdges(allFolders, nodeByPath, focusSet);
+    }
   }
 
-  private buildLayout(title: string, preserveCamera = false): Partial<Plotly.Layout> {
-    const allNodes   = this.result?.nodes ?? [];
-    const allFolders = allNodes.filter(n => !n.isFile);
-    const coords     = allFolders.flatMap(n => [Math.abs(n.x), Math.abs(n.y)]);
-    const xyMax      = Math.max(...coords, 1) * 1.1;
-    const xyRange    = [-xyMax, xyMax];
+  private addPoints(
+    subset: PositionedNode[],
+    opacity: number,
+    colorOf: (n: PositionedNode) => THREE.Color,
+    toSize:  (bytes: number) => number,
+  ): void {
+    const n   = subset.length;
+    const pos = new Float32Array(n * 3);
+    const col = new Float32Array(n * 3);
+    const siz = new Float32Array(n);
 
-    // Read current camera from the live Plotly figure when preserving
-    const currentCamera = preserveCamera
-      ? (this.el as any)?._fullLayout?.scene?.camera
-      : null;
-
-    // Compute initial camera distance from tree bounding box so the full tree
-    // is visible on first load without needing to zoom in.
-    // Plotly eye coords are in normalised scene units where 1 = half the axis range.
-    // We place the eye along +Y at a distance proportional to the largest dimension.
-    let camera = currentCamera;
-    if (!camera) {
-      const xs = allNodes.map(n => n.x);
-      const ys = allNodes.map(n => n.y);
-      const zs = allNodes.map(n => n.z);
-      const spanX = Math.max(...xs) - Math.min(...xs) || 1;
-      const spanY = Math.max(...ys) - Math.min(...ys) || 1;
-      const spanZ = Math.max(...zs) - Math.min(...zs) || 1;
-      const maxSpan = Math.max(spanX, spanY, spanZ);
-      // Normalise against the xy axis range (2*xyMax = full axis width in data units).
-      // eye distance of 1 shows roughly one axis-width; scale so maxSpan fits.
-      const dist = Math.max(1.2, (maxSpan / (2 * xyMax)) * 1.5);
-      camera = { eye: { x: 0, y: dist, z: dist * 0.25 }, up: { x: 0, y: 0, z: 1 } };
+    for (let i = 0; i < n; i++) {
+      const node = subset[i];
+      pos[i * 3]     = -node.x; // negate X to preserve handedness after Y↔Z swap
+      pos[i * 3 + 1] = node.z;  // layout Z is the elevation axis → Three.js Y (up)
+      pos[i * 3 + 2] = node.y;
+      const c = colorOf(node);
+      col[i * 3]     = c.r;
+      col[i * 3 + 1] = c.g;
+      col[i * 3 + 2] = c.b;
+      siz[i] = toSize(node.isFile ? (node.fileSize ?? 0) : node.subtreeBytes);
     }
 
-    return {
-      title: { text: title, font: { color: '#e8eaef' } },
-      paper_bgcolor: '#0c0e12',
-      scene: {
-        bgcolor: '#0c0e12',
-        xaxis: {
-          showbackground: false,
-          showgrid: false,
-          zeroline: false,
-          showticklabels: false,
-          showspikes: false,
-          title: { text: '' },
-          range: xyRange,
-        },
-        yaxis: {
-          showbackground: false,
-          showgrid: false,
-          zeroline: false,
-          showticklabels: false,
-          showspikes: false,
-          title: { text: '' },
-          range: xyRange,
-        },
-        zaxis: {
-          showbackground: false,
-          showgrid: false,
-          zeroline: false,
-          showticklabels: false,
-          showspikes: false,
-          title: { text: '' },
-        },
-        aspectmode: 'auto',
-        camera,
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('aColor',   new THREE.BufferAttribute(col, 3));
+    geo.setAttribute('aSize',    new THREE.BufferAttribute(siz, 1));
+    geo.userData['nodes'] = subset;
+
+    const mat = new THREE.ShaderMaterial({
+      vertexShader:   VERT,
+      fragmentShader: FRAG,
+      uniforms: {
+        uOpacity:    { value: opacity },
+        uPixelRatio: { value: devicePixelRatio },
       },
-      showlegend: false,
-      margin: { l: 0, r: 0, t: 50, b: 0 },
-      font: { color: '#c8d0e0' },
-    };
+      transparent: true,
+      depthWrite:  opacity >= 1,
+    });
+
+    const points = new THREE.Points(geo, mat);
+    this.scene.add(points);
+    this.sceneObjects.push(points);
+  }
+
+  private addEdges(
+    allFolders: PositionedNode[],
+    nodeByPath: Map<string, PositionedNode>,
+    focusSet: Set<string> | null,
+  ): void {
+    const inFocus = (path: string) => !focusSet || focusSet.has(path);
+    const canvas  = this.canvasRef.nativeElement;
+
+    const DEPTH_BUCKETS = 5;
+    const zValues = allFolders.map(n => n.z);
+    const zMin    = Math.min(...zValues, 0);
+    const zRange  = Math.max(...zValues, 1) - zMin || 1;
+
+    // Group segments by (focused, depthBucket, widthBucket) — each batch = one material
+    type Batch = { pos: number[]; col: number[]; depthAlpha: number; width: number };
+    const batches = new Map<string, Batch>();
+
+    for (const node of allFolders) {
+      if (!node.path) continue;
+      const parentPath = node.path.includes('/')
+        ? node.path.substring(0, node.path.lastIndexOf('/'))
+        : '';
+      const parent = nodeByPath.get(parentPath);
+      if (!parent) continue;
+
+      const hue        = hashPath(node.path) % 360;
+      const c          = new THREE.Color(`hsl(${hue},20%,60%)`);
+      const focused    = inFocus(node.path) && inFocus(parentPath);
+      const depthBucket = Math.min(
+        Math.floor((node.z - zMin) / zRange * DEPTH_BUCKETS), DEPTH_BUCKETS - 1);
+      const depthAlpha  = focused
+        ? 0.8 - 0.65 * (depthBucket / (DEPTH_BUCKETS - 1))  // 0.8 → 0.15
+        : DIM;
+      const W_IN_MIN = 2, W_IN_MAX = 12, W_OUT_MIN = 1, W_OUT_MAX = 5;
+      const scaledW = this.display.connectorWidth *
+        (W_OUT_MIN + (W_OUT_MAX - W_OUT_MIN) * (node.connectionWidth - W_IN_MIN) / (W_IN_MAX - W_IN_MIN));
+      const wBucket = Math.round(scaledW * 2) / 2;
+      const key     = `${focused ? 1 : 0}-${depthBucket}-${wBucket}`;
+
+      if (!batches.has(key)) batches.set(key, { pos: [], col: [], depthAlpha, width: scaledW });
+      const b = batches.get(key)!;
+      // Swap Y↔Z: layout Z is elevation → Three.js Y
+      b.pos.push(-parent.x, parent.z, parent.y, -node.x, node.z, node.y);
+      b.col.push(c.r, c.g, c.b, c.r, c.g, c.b);
+    }
+
+    for (const [, { pos, col, depthAlpha, width }] of batches) {
+      const opacity  = this.display.connectorOpacity * depthAlpha;
+      const geo      = new LineSegmentsGeometry();
+      geo.setPositions(pos);
+      geo.setColors(col);
+      const mat = new LineMaterial({
+        vertexColors: true,
+        transparent:  true,
+        opacity,
+        linewidth:    width,
+        depthWrite:   false,
+        resolution:   new THREE.Vector2(canvas.clientWidth, canvas.clientHeight),
+        worldUnits:   false,
+      });
+      const segs = new LineSegments2(geo, mat);
+      this.scene.add(segs);
+      this.sceneObjects.push(segs);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Camera
+  // ---------------------------------------------------------------------------
+
+  private fitCamera(): void {
+    const nodes = this.result?.nodes;
+    if (!nodes?.length) return;
+
+    // Refresh aspect ratio from actual canvas size
+    const canvas = this.canvasRef.nativeElement;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (w && h) {
+      this.camera.aspect = w / h;
+      this.camera.updateProjectionMatrix();
+    }
+
+    // Bounding box directly from node positions in Three.js space (-n.x, n.z, n.y)
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+    for (const n of nodes) {
+      const x = -n.x, y = n.z, z = n.y;
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+      if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+    }
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const cz = (minZ + maxZ) / 2;
+
+    const vFov  = THREE.MathUtils.degToRad(this.camera.fov);
+    const hFov  = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
+    const tanH  = Math.tan(hFov / 2);
+    const tanV  = Math.tan(vFov / 2);
+
+    // Camera axes for fixed elevation angle (looking from +Z side, slightly above)
+    const elev = 0.2; // ~11°
+    // forward d = (0, -sin, -cos), right r = (1, 0, 0), up u = (0, cos, -sin)
+    const sd = Math.sin(elev), cd = Math.cos(elev);
+
+    // Exact minimum dist: for each node, dist >= |dx|/tanH - dz  AND  |dy|/tanV - dz
+    // where dx/dy/dz are projections of (node - center) onto camera right/up/forward axes.
+    let minDist = 0;
+    for (const n of nodes) {
+      const vx = -n.x - cx;   // Three.js coords relative to scene center
+      const vy =  n.z - cy;
+      const vz =  n.y - cz;
+
+      const dx =  vx;                   // dot(v, right=(1,0,0))
+      const dy =  vy * cd - vz * sd;    // dot(v, up=(0,cos,-sin))
+      const dz = -vy * sd - vz * cd;    // dot(v, forward=(0,-sin,-cos))
+
+      minDist = Math.max(minDist, Math.abs(dx) / tanH - dz);
+      minDist = Math.max(minDist, Math.abs(dy) / tanV - dz);
+    }
+    const dist = minDist * 1.02; // 2% breathing room
+
+    this.controls.target.set(cx, cy, cz);
+    this.camera.position.set(cx, cy + dist * sd, cz + dist * cd);
+    this.camera.updateProjectionMatrix();
+    this.controls.update();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Focus system
+  // ---------------------------------------------------------------------------
+
+  private buildFocusSet(nodes: PositionedNode[], focusPath: string): Set<string> {
+    const set = new Set<string>();
+    set.add(focusPath);
+    const parts = focusPath.split('/');
+    for (let i = 1; i < parts.length; i++) set.add(parts.slice(0, i).join('/'));
+    set.add('');
+    const prefix = focusPath ? focusPath + '/' : '';
+    for (const n of nodes) {
+      if (prefix === '' || n.path.startsWith(prefix)) set.add(n.path);
+    }
+    return set;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Raycasting (hover + click)
+  // ---------------------------------------------------------------------------
+
+  private raycast(event: MouseEvent): PositionedNode | null {
+    const canvas = this.canvasRef.nativeElement;
+    const rect   = canvas.getBoundingClientRect();
+    const ndc    = new THREE.Vector2(
+       ((event.clientX - rect.left)  / rect.width)  * 2 - 1,
+      -((event.clientY - rect.top)   / rect.height) * 2 + 1,
+    );
+
+    const raycaster = new THREE.Raycaster();
+    // Scale threshold with camera distance so picking works at any zoom level
+    const camDist = this.camera.position.distanceTo(this.controls.target);
+    raycaster.params.Points!.threshold = camDist * 0.012;
+    raycaster.setFromCamera(ndc, this.camera);
+
+    let closest: { dist: number; node: PositionedNode } | null = null;
+
+    for (const obj of this.sceneObjects) {
+      if (!(obj instanceof THREE.Points)) continue;
+      const hits = raycaster.intersectObject(obj);
+      if (!hits.length) continue;
+      const hit   = hits[0];
+      const nodes = obj.geometry.userData['nodes'] as PositionedNode[];
+      const node  = nodes[hit.index!];
+      if (!closest || hit.distance < closest.dist) closest = { dist: hit.distance, node };
+    }
+
+    return closest?.node ?? null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Event handlers
+  // ---------------------------------------------------------------------------
+
+  private _onMouseDown(e: MouseEvent): void {
+    this.mouseDownX = e.clientX;
+    this.mouseDownY = e.clientY;
+  }
+
+  private _onMouseMove(e: MouseEvent): void {
+    const node = this.raycast(e);
+    if (node) {
+      const hex = '#' + this.colorOf(node).clone().convertLinearToSRGB().getHexString();
+      this.tipEl.innerHTML = node.isFile
+        ? `<div>${node.path}</div><div>${(node.fileSize ?? 0).toLocaleString()} bytes</div>`
+        : `<div>${node.path || '(root)'}</div>`;
+      this.tipEl.style.background = hex;
+      this.tipEl.style.borderLeft = '';
+      this.tipEl.style.display = '';
+      this.tipEl.style.left = `${e.clientX + 12}px`;
+      this.tipEl.style.top  = `${e.clientY + 12}px`;
+      this.canvasRef.nativeElement.style.cursor = 'pointer';
+    } else {
+      this.tipEl.style.display = 'none';
+      this.canvasRef.nativeElement.style.cursor = '';
+    }
+  }
+
+  private _onMouseLeave(): void {
+    this.tipEl.style.display = 'none';
+    this.canvasRef.nativeElement.style.cursor = '';
+  }
+
+  private _onClick(e: MouseEvent): void {
+    const dx = e.clientX - this.mouseDownX;
+    const dy = e.clientY - this.mouseDownY;
+    if (Math.sqrt(dx * dx + dy * dy) > 4) return; // drag, not click
+
+    const node = this.raycast(e);
+    if (node) {
+      this.focusPath = this.focusPath === node.path ? null : node.path;
+    } else {
+      if (this.focusPath === null) return;
+      this.focusPath = null;
+    }
+    if (this.result) this.rebuildScene();
   }
 }
