@@ -1,6 +1,11 @@
 import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, SimpleChanges, OnChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { TooltipDirective } from '../../../shared/directives/tooltip.directive';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatSliderModule } from '@angular/material/slider';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { Subject, debounceTime, takeUntil } from 'rxjs';
 import { DEFAULT_DISPLAY_OPTIONS, DEFAULT_LAYOUT_PARAMS, DisplayOptions, LayoutParams, LoadingState } from '../../../shared/models/tree-node.model';
 
@@ -10,7 +15,15 @@ export interface RepoSubmitEvent {
 
 @Component({
   selector: 'app-controls-panel',
-  imports: [FormsModule, TooltipDirective],
+  imports: [
+    FormsModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatButtonModule,
+    MatCheckboxModule,
+    MatSliderModule,
+    MatTooltipModule,
+  ],
   templateUrl: './controls-panel.html',
   styleUrl: './controls-panel.scss',
 })
@@ -63,7 +76,6 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
   }
 
   ngOnDestroy(): void {
-
     this.destroy$.next();
     this.destroy$.complete();
   }

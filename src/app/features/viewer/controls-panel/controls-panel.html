@@ -15,16 +15,22 @@
       <!-- Repo input -->
       <section class="section">
         <label class="section-label">Repository</label>
-        <input
-          class="repo-input"
-          type="text"
-          placeholder="github.com/owner/repo"
-          [(ngModel)]="repoUrl"
-          (keydown.enter)="onSubmit()"
-        />
-        <button class="render-btn" (click)="onSubmit()" [disabled]="status !== 'idle' || !repoUrl.trim()"
+        <mat-form-field appearance="outline" class="repo-field">
+          <input
+            matInput
+            placeholder="github.com/owner/repo"
+            [(ngModel)]="repoUrl"
+            (keydown.enter)="onSubmit()"
+          />
+        </mat-form-field>
+        <button
+          mat-flat-button
+          class="render-btn"
+          (click)="onSubmit()"
+          [disabled]="status !== 'idle' || !repoUrl.trim()"
           [class.fetching]="status === 'fetching'"
-          [class.computing]="status === 'computing'">
+          [class.computing]="status === 'computing'"
+        >
           @switch (status) {
             @case ('fetching')  { <span class="btn-spinner"></span> Fetching… }
             @case ('computing') { <span class="btn-spinner"></span> Rendering… }
@@ -37,66 +43,41 @@
       <section class="section">
         <label class="section-label">Display</label>
         @for (opt of displayOptions; track opt.key) {
-          <label class="toggle-row">
-            <input type="checkbox" [(ngModel)]="display[opt.key]" (ngModelChange)="onDisplayChange()" />
-            <span>{{ opt.label }}</span>
-          </label>
+          <mat-checkbox
+            [(ngModel)]="display[opt.key]"
+            (ngModelChange)="onDisplayChange()"
+          >{{ opt.label }}</mat-checkbox>
         }
+
         <div class="slider-row">
           <div class="slider-meta">
             <span class="slider-label">Connector opacity</span>
             <span class="slider-value">{{ display.connectorOpacity }}</span>
           </div>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            [(ngModel)]="display.connectorOpacity"
-            (ngModelChange)="onDisplayChange()"
-          />
+          <mat-slider min="0" max="1" step="0.05">
+            <input matSliderThumb [(ngModel)]="display.connectorOpacity" (ngModelChange)="onDisplayChange()" />
+          </mat-slider>
         </div>
+
         <div class="slider-row">
           <div class="slider-meta">
             <span class="slider-label">Connector width</span>
             <span class="slider-value">{{ display.connectorWidth }}</span>
           </div>
-          <input
-            type="range"
-            min="0.2"
-            max="20"
-            step="0.1"
-            [(ngModel)]="display.connectorWidth"
-            (ngModelChange)="onDisplayChange()"
-          />
+          <mat-slider min="0.2" max="20" step="0.1">
+            <input matSliderThumb [(ngModel)]="display.connectorWidth" (ngModelChange)="onDisplayChange()" />
+          </mat-slider>
         </div>
+
         <div class="slider-row">
           <div class="slider-meta">
-            <span class="slider-label">Dot min size</span>
-            <span class="slider-value">{{ display.dotMin }}</span>
+            <span class="slider-label">Dot size</span>
+            <span class="slider-value">{{ display.dotMin }} – {{ display.dotMax }}</span>
           </div>
-          <input
-            type="range"
-            min="1"
-            max="10"
-            step="0.5"
-            [(ngModel)]="display.dotMin"
-            (ngModelChange)="onDisplayChange()"
-          />
-        </div>
-        <div class="slider-row">
-          <div class="slider-meta">
-            <span class="slider-label">Dot max size</span>
-            <span class="slider-value">{{ display.dotMax }}</span>
-          </div>
-          <input
-            type="range"
-            min="2"
-            max="30"
-            step="0.5"
-            [(ngModel)]="display.dotMax"
-            (ngModelChange)="onDisplayChange()"
-          />
+          <mat-slider min="1" max="30" step="0.5">
+            <input matSliderStartThumb [(ngModel)]="display.dotMin" (ngModelChange)="onDisplayChange()" />
+            <input matSliderEndThumb [(ngModel)]="display.dotMax" (ngModelChange)="onDisplayChange()" />
+          </mat-slider>
         </div>
       </section>
 
@@ -109,7 +90,7 @@
       <section class="section">
         <div class="section-label">
           Layout
-          <button class="reset-btn" (click)="onReset()" appTooltip="Reset to defaults">↺</button>
+          <button mat-icon-button class="reset-btn" (click)="onReset()" matTooltip="Reset to defaults">↺</button>
         </div>
 
         @for (s of sliders; track s.key) {
@@ -118,14 +99,9 @@
               <span class="slider-label">{{ s.label }}</span>
               <span class="slider-value">{{ params[s.key] }}</span>
             </div>
-            <input
-              type="range"
-              [min]="s.min"
-              [max]="s.max"
-              [step]="s.step"
-              [(ngModel)]="params[s.key]"
-              (ngModelChange)="onSliderChange()"
-            />
+            <mat-slider [min]="s.min" [max]="s.max" [step]="s.step">
+              <input matSliderThumb [(ngModel)]="params[s.key]" (ngModelChange)="onSliderChange()" />
+            </mat-slider>
           </div>
         }
       </section>
