@@ -56,11 +56,14 @@ const VERT = /* glsl */`
   attribute float aSize;
   attribute vec3  aColor;
   varying   vec3  vColor;
+  varying   float vDist;
   uniform   float uPixelRatio;
 
   void main() {
     vColor = aColor;
-    vec4 mv      = modelViewMatrix * vec4(position, 1.0);
+    vec4 world   = modelMatrix * vec4(position, 1.0);
+    vDist        = length(cameraPosition - world.xyz);
+    vec4 mv      = viewMatrix * world;
     gl_PointSize = aSize * uPixelRatio;
     gl_Position  = projectionMatrix * mv;
   }
@@ -68,7 +71,11 @@ const VERT = /* glsl */`
 
 const FRAG = /* glsl */`
   uniform float uOpacity;
+  uniform float uFogNear;
+  uniform float uFogDensity;
+  uniform vec3  uFogColor;
   varying vec3  vColor;
+  varying float vDist;
 
   void main() {
     // Circular disc with soft edge
@@ -76,7 +83,13 @@ const FRAG = /* glsl */`
     float r  = dot(uv, uv);
     if (r > 0.25) discard;
     float alpha = (1.0 - smoothstep(0.18, 0.25, r)) * uOpacity;
-    gl_FragColor = vec4(vColor, alpha);
+
+    // Fog starts at the nearest node so front nodes are always fully bright
+    float d   = max(0.0, vDist - uFogNear);
+    float fog = 1.0 - exp(-uFogDensity * d * d);
+    vec3 color = mix(vColor, uFogColor, fog);
+
+    gl_FragColor = vec4(color, alpha);
     #include <colorspace_fragment>
   }
 `;
@@ -107,6 +120,10 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
 
   // Scene objects — replaced on each rebuildScene()
   private sceneObjects: THREE.Object3D[] = [];
+  private pointMaterials: THREE.ShaderMaterial[] = [];
+  private nodePositions: Float32Array = new Float32Array(); // Three.js coords, for fog near
+  private fogDensity = 0;
+  private fogSpan    = 1;
 
   // Tooltip
   private tipEl!: HTMLDivElement;
@@ -186,6 +203,7 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
 
     this.scene = new THREE.Scene();
     this.scene.background = BG;
+    this.scene.fog = new THREE.Fog(BG.getHex(), 1, 2); // near/far updated each frame
 
     this.camera = new THREE.PerspectiveCamera(60, w / h, 0.01, 2000);
     this.camera.position.set(0, 15, 5);
@@ -200,9 +218,36 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
     const loop = () => {
       this.rafId = requestAnimationFrame(loop);
       this.controls.update();
+      this.updateFog();
       this.renderer.render(this.scene, this.camera);
     };
     loop();
+  }
+
+  private updateFog(): void {
+    if (!this.pointMaterials.length || !this.nodePositions.length) return;
+    const cx = this.camera.position.x;
+    const cy = this.camera.position.y;
+    const cz = this.camera.position.z;
+    let minDist = Infinity;
+    for (let i = 0; i < this.nodePositions.length; i += 3) {
+      const dx = this.nodePositions[i]     - cx;
+      const dy = this.nodePositions[i + 1] - cy;
+      const dz = this.nodePositions[i + 2] - cz;
+      const d  = dx * dx + dy * dy + dz * dz;
+      if (d < minDist) minDist = d;
+    }
+    const near = Math.sqrt(minDist);
+    // Update point shader fog uniforms
+    for (const mat of this.pointMaterials) {
+      mat.uniforms['uFogNear'].value    = near;
+      mat.uniforms['uFogDensity'].value = this.fogDensity;
+    }
+    // Update scene fog for connectors (LineMaterial uses scene fog automatically)
+    if (this.scene.fog instanceof THREE.Fog) {
+      this.scene.fog.near = near;
+      this.scene.fog.far  = near + this.fogSpan;
+    }
   }
 
   private onResize(): void {
@@ -238,7 +283,8 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
         if (Array.isArray(mat)) mat.forEach((m: any) => m.dispose()); else mat.dispose();
       }
     }
-    this.sceneObjects = [];
+    this.sceneObjects   = [];
+    this.pointMaterials = [];
 
     if (!this.result) return;
     const nodes    = this.result.nodes;
@@ -276,6 +322,23 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
     const cbrtRange = cbrtMax - cbrtMin || 1;
     const toSize    = (bytes: number) =>
       dotMin + (dotMax - dotMin) * (Math.cbrt(bytes) - cbrtMin) / cbrtRange;
+
+    // Build flat position array (Three.js coords) for fog near computation each frame
+    this.nodePositions = new Float32Array(nodes.length * 3);
+    for (let i = 0; i < nodes.length; i++) {
+      this.nodePositions[i * 3]     = -nodes[i].x;
+      this.nodePositions[i * 3 + 1] =  nodes[i].z;
+      this.nodePositions[i * 3 + 2] =  nodes[i].y;
+    }
+
+    // Fog density relative to scene bounding box size
+    const xs = nodes.map(n => n.x), ys = nodes.map(n => n.y), zs = nodes.map(n => n.z);
+    const span = Math.max(
+      Math.max(...xs) - Math.min(...xs),
+      Math.max(...ys) - Math.min(...ys),
+      Math.max(...zs) - Math.min(...zs), 1);
+    this.fogDensity = 2.5 / span;
+    this.fogSpan    = span;
 
     // Split focused / dimmed
     const focused = focusSet ? visible.filter(n =>  inFocus(n.path)) : visible;
@@ -327,11 +390,15 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
       uniforms: {
         uOpacity:    { value: opacity },
         uPixelRatio: { value: devicePixelRatio },
+        uFogNear:    { value: 0 },
+        uFogDensity: { value: this.fogDensity },
+        uFogColor:   { value: BG },
       },
       transparent: true,
       depthWrite:  opacity >= 1,
     });
 
+    this.pointMaterials.push(mat);
     const points = new THREE.Points(geo, mat);
     this.scene.add(points);
     this.sceneObjects.push(points);
@@ -396,6 +463,7 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
         depthWrite:   false,
         resolution:   new THREE.Vector2(canvas.clientWidth, canvas.clientHeight),
         worldUnits:   false,
+        fog:          true,
       });
       const segs = new LineSegments2(geo, mat);
       this.scene.add(segs);
