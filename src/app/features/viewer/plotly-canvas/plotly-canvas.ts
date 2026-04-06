@@ -13,6 +13,7 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
+  LessEqualDepth,
   MathUtils,
   Object3D,
   PerspectiveCamera,
@@ -76,9 +77,7 @@ const VERT = /* glsl */`
     vColor = aColor;
     vec4 mv      = modelViewMatrix * vec4(position, 1.0);
     gl_PointSize = aSize * uPixelRatio;
-    vec4 clip    = projectionMatrix * mv;
-    clip.z      -= 0.002 * clip.w; // bias toward camera so markers win depth test over connectors
-    gl_Position  = clip;
+    gl_Position  = projectionMatrix * mv;
   }
 `;
 
@@ -346,9 +345,11 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
       },
       transparent: true,
       depthWrite:  opacity >= 1,
+      depthFunc:   LessEqualDepth,
     });
 
     const points = new Points(geo, mat);
+    points.renderOrder = 1; // draw after connectors; depth test handles real occlusion
     this.scene.add(points);
     this.sceneObjects.push(points);
   }
@@ -404,12 +405,15 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
       geo.setPositions(pos);
       geo.setColors(col);
       const mat = new LineMaterial({
-        vertexColors: true,
-        transparent:  false,
-        linewidth:    width,
-        depthWrite:   true,
-        resolution:   new Vector2(canvas.clientWidth, canvas.clientHeight),
-        worldUnits:   false,
+        vertexColors:        true,
+        transparent:         false,
+        linewidth:           width,
+        depthWrite:          true,
+        resolution:          new Vector2(canvas.clientWidth, canvas.clientHeight),
+        worldUnits:          false,
+        polygonOffset:       true,
+        polygonOffsetFactor: 1,
+        polygonOffsetUnits:  1,
       });
       const segs = new LineSegments2(geo, mat);
       this.scene.add(segs);
