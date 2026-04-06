@@ -386,9 +386,9 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
       const depthAlpha  = focused
         ? 0.8 - 0.65 * (depthBucket / (DEPTH_BUCKETS - 1))  // 0.8 → 0.15
         : DIM;
-      const W_IN_MIN = 2, W_IN_MAX = 12, W_OUT_MIN = 1, W_OUT_MAX = 5;
-      const scaledW = this.display.connectorWidth *
-        (W_OUT_MIN + (W_OUT_MAX - W_OUT_MIN) * (node.connectionWidth - W_IN_MIN) / (W_IN_MAX - W_IN_MIN));
+      const W_IN_MIN = 2, W_IN_MAX = 12;
+      const t = Math.max(0, Math.min(1, (node.connectionWidth - W_IN_MIN) / (W_IN_MAX - W_IN_MIN)));
+      const scaledW = this.display.connectorWidthMin + (this.display.connectorWidthMax - this.display.connectorWidthMin) * t;
       const wBucket = Math.round(scaledW * 2) / 2;
       const key     = `${focused ? 1 : 0}-${depthBucket}-${wBucket}`;
 
