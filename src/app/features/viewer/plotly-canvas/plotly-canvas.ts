@@ -349,7 +349,7 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
     });
 
     const points = new Points(geo, mat);
-    points.renderOrder = 1; // draw after connectors; depth test handles real occlusion
+    points.renderOrder = 0; // draw before connectors so dots write depth first
     this.scene.add(points);
     this.sceneObjects.push(points);
   }
@@ -362,7 +362,7 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
     const inFocus = (path: string) => !focusSet || focusSet.has(path);
     const canvas  = this.canvasRef.nativeElement;
 
-    const DEPTH_BUCKETS = 5;
+    const DEPTH_BUCKETS = 8;
     const zValues = allFolders.map(n => n.z);
     const zMin    = Math.min(...zValues, 0);
     const zRange  = Math.max(...zValues, 1) - zMin || 1;
@@ -400,15 +400,16 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
       b.col.push(c.r, c.g, c.b, c.r, c.g, c.b);
     }
 
-    for (const [, { pos, col, width }] of batches) {
+    for (const [, { pos, col, width, depthAlpha }] of batches) {
       const geo      = new LineSegmentsGeometry();
       geo.setPositions(pos);
       geo.setColors(col);
       const mat = new LineMaterial({
         vertexColors:        true,
-        transparent:         false,
+        transparent:         true,
+        opacity:             this.display.connectorOpacity * depthAlpha,
         linewidth:           width,
-        depthWrite:          true,
+        depthWrite:          false,
         resolution:          new Vector2(canvas.clientWidth, canvas.clientHeight),
         worldUnits:          false,
         polygonOffset:       true,
@@ -416,6 +417,7 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
         polygonOffsetUnits:  1,
       });
       const segs = new LineSegments2(geo, mat);
+      segs.renderOrder = 1; // draw after dots; depthWrite:false lets dots show through
       this.scene.add(segs);
       this.sceneObjects.push(segs);
     }
