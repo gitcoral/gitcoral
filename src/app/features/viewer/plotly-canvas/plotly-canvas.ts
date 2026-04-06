@@ -9,7 +9,21 @@ import {
   ViewChild,
 } from '@angular/core';
 import { DEFAULT_DISPLAY_OPTIONS, DisplayOptions, LayoutResult, PositionedNode } from '../../../shared/models/tree-node.model';
-import * as THREE from 'three';
+import {
+  BufferAttribute,
+  BufferGeometry,
+  Color,
+  MathUtils,
+  Object3D,
+  PerspectiveCamera,
+  Points,
+  LineSegments,
+  Scene,
+  ShaderMaterial,
+  Vector2,
+  Vector3,
+  WebGLRenderer,
+} from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
@@ -20,7 +34,7 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 // ---------------------------------------------------------------------------
 
 const DIM = 0.08;
-const BG  = new THREE.Color(0x0c0e12);
+const BG  = new Color(0x0c0e12);
 
 // ---------------------------------------------------------------------------
 // Colour helpers  (same logic as before)
@@ -32,18 +46,18 @@ function hashPath(path: string): number {
   return Math.abs(h);
 }
 
-function folderColor(path: string): THREE.Color {
-  return new THREE.Color(`hsl(${hashPath(path) % 360},35%,42%)`);
+function folderColor(path: string): Color {
+  return new Color(`hsl(${hashPath(path) % 360},35%,42%)`);
 }
 
-export function buildExtColorMap(extCounts: Map<string, number>): Map<string, THREE.Color> {
+export function buildExtColorMap(extCounts: Map<string, number>): Map<string, Color> {
   const GOLDEN = 0.61803398875;
   const sorted = [...extCounts.entries()].sort((a, b) => b[1] - a[1]);
-  const map    = new Map<string, THREE.Color>();
+  const map    = new Map<string, Color>();
   sorted.forEach(([ext], i) => {
     const hue       = Math.round((i * GOLDEN % 1) * 360);
     const lightness = i % 2 === 0 ? 65 : 75;
-    map.set(ext, new THREE.Color(`hsl(${hue},80%,${lightness}%)`));
+    map.set(ext, new Color(`hsl(${hue},80%,${lightness}%)`));
   });
   return map;
 }
@@ -99,20 +113,20 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
   @Input() display: DisplayOptions = { ...DEFAULT_DISPLAY_OPTIONS };
   @ViewChild('canvas', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
 
-  private renderer!: THREE.WebGLRenderer;
-  private scene!: THREE.Scene;
-  private camera!: THREE.PerspectiveCamera;
+  private renderer!: WebGLRenderer;
+  private scene!: Scene;
+  private camera!: PerspectiveCamera;
   private controls!: OrbitControls;
   private rafId = 0;
   private resizeObserver!: ResizeObserver;
   private focusPath: string | null = null;
 
   // Scene objects — replaced on each rebuildScene()
-  private sceneObjects: THREE.Object3D[] = [];
+  private sceneObjects: Object3D[] = [];
 
   // Tooltip
   private tipEl!: HTMLDivElement;
-  private colorOf: ((n: PositionedNode) => THREE.Color) = () => new THREE.Color('#8892a4');
+  private colorOf: ((n: PositionedNode) => Color) = () => new Color('#8892a4');
 
   // Drag detection
   private mouseDownX = 0;
@@ -182,14 +196,14 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
     const w = canvas.clientWidth  || 800;
     const h = canvas.clientHeight || 600;
 
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    this.renderer = new WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(devicePixelRatio);
     this.renderer.setSize(w, h, false);
 
-    this.scene = new THREE.Scene();
+    this.scene = new Scene();
     this.scene.background = BG;
 
-    this.camera = new THREE.PerspectiveCamera(60, w / h, 0.01, 2000);
+    this.camera = new PerspectiveCamera(60, w / h, 0.01, 2000);
     this.camera.position.set(0, 15, 5);
 
     this.controls = new OrbitControls(this.camera, canvas);
@@ -216,8 +230,8 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h, false);
     for (const obj of this.sceneObjects) {
-      if (obj instanceof THREE.Points) {
-        const mat = obj.material as THREE.ShaderMaterial;
+      if (obj instanceof Points) {
+        const mat = obj.material as ShaderMaterial;
         if (mat.uniforms['uPixelRatio']) mat.uniforms['uPixelRatio'].value = devicePixelRatio;
       }
       if (obj instanceof LineSegments2) {
@@ -234,7 +248,7 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
     // Remove and dispose previous scene objects
     for (const obj of this.sceneObjects) {
       this.scene.remove(obj);
-      if (obj instanceof THREE.Points || obj instanceof THREE.LineSegments || obj instanceof LineSegments2) {
+      if (obj instanceof Points || obj instanceof LineSegments || obj instanceof LineSegments2) {
         (obj as any).geometry.dispose();
         const mat = (obj as any).material;
         if (Array.isArray(mat)) mat.forEach((m: any) => m.dispose()); else mat.dispose();
@@ -257,11 +271,11 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
       extCounts.set(ext, (extCounts.get(ext) ?? 0) + 1);
     }
     const colorMap = buildExtColorMap(extCounts);
-    this.colorOf   = (n: PositionedNode): THREE.Color => {
+    this.colorOf   = (n: PositionedNode): Color => {
       if (!n.isFile) return folderColor(n.path);
       const dot = n.path.lastIndexOf('.');
-      if (dot < 0 || dot === n.path.length - 1) return new THREE.Color('#8892a4');
-      return colorMap.get(n.path.slice(dot + 1).toLowerCase()) ?? new THREE.Color('#8892a4');
+      if (dot < 0 || dot === n.path.length - 1) return new Color('#8892a4');
+      return colorMap.get(n.path.slice(dot + 1).toLowerCase()) ?? new Color('#8892a4');
     };
     const colorOf = this.colorOf;
 
@@ -297,7 +311,7 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
   private addPoints(
     subset: PositionedNode[],
     opacity: number,
-    colorOf: (n: PositionedNode) => THREE.Color,
+    colorOf: (n: PositionedNode) => Color,
     toSize:  (bytes: number) => number,
   ): void {
     const n   = subset.length;
@@ -317,13 +331,13 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
       siz[i] = toSize(node.isFile ? (node.fileSize ?? 0) : node.subtreeBytes);
     }
 
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute('aColor',   new THREE.BufferAttribute(col, 3));
-    geo.setAttribute('aSize',    new THREE.BufferAttribute(siz, 1));
+    const geo = new BufferGeometry();
+    geo.setAttribute('position', new BufferAttribute(pos, 3));
+    geo.setAttribute('aColor',   new BufferAttribute(col, 3));
+    geo.setAttribute('aSize',    new BufferAttribute(siz, 1));
     geo.userData['nodes'] = subset;
 
-    const mat = new THREE.ShaderMaterial({
+    const mat = new ShaderMaterial({
       vertexShader:   VERT,
       fragmentShader: FRAG,
       uniforms: {
@@ -334,7 +348,7 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
       depthWrite:  opacity >= 1,
     });
 
-    const points = new THREE.Points(geo, mat);
+    const points = new Points(geo, mat);
     this.scene.add(points);
     this.sceneObjects.push(points);
   }
@@ -365,7 +379,7 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
       if (!parent) continue;
 
       const hue        = hashPath(node.path) % 360;
-      const c          = new THREE.Color(`hsl(${hue},20%,60%)`);
+      const c          = new Color(`hsl(${hue},20%,60%)`);
       const focused    = inFocus(node.path) && inFocus(parentPath);
       const depthBucket = Math.min(
         Math.floor((node.z - zMin) / zRange * DEPTH_BUCKETS), DEPTH_BUCKETS - 1);
@@ -394,7 +408,7 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
         transparent:  false,
         linewidth:    width,
         depthWrite:   true,
-        resolution:   new THREE.Vector2(canvas.clientWidth, canvas.clientHeight),
+        resolution:   new Vector2(canvas.clientWidth, canvas.clientHeight),
         worldUnits:   false,
       });
       const segs = new LineSegments2(geo, mat);
@@ -433,7 +447,7 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
     const cy = (minY + maxY) / 2;
     const cz = (minZ + maxZ) / 2;
 
-    const vFov  = THREE.MathUtils.degToRad(this.camera.fov);
+    const vFov  = MathUtils.degToRad(this.camera.fov);
     const hFov  = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
     const tanH  = Math.tan(hFov / 2);
     const tanV  = Math.tan(vFov / 2);
@@ -499,13 +513,13 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
     // This is correct for billboard points whose visual size is fixed in pixels
     // regardless of camera distance, unlike a world-space raycaster threshold.
     let closest: { depth: number; node: PositionedNode } | null = null;
-    const proj = new THREE.Vector3();
+    const proj = new Vector3();
 
     for (const obj of this.sceneObjects) {
-      if (!(obj instanceof THREE.Points)) continue;
+      if (!(obj instanceof Points)) continue;
       const nodes   = obj.geometry.userData['nodes'] as PositionedNode[];
-      const posAttr = obj.geometry.getAttribute('position') as THREE.BufferAttribute;
-      const sizAttr = obj.geometry.getAttribute('aSize')    as THREE.BufferAttribute;
+      const posAttr = obj.geometry.getAttribute('position') as BufferAttribute;
+      const sizAttr = obj.geometry.getAttribute('aSize')    as BufferAttribute;
 
       for (let i = 0; i < nodes.length; i++) {
         proj.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
