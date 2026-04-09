@@ -47,9 +47,6 @@ function hashPath(path: string): number {
   return Math.abs(h);
 }
 
-function folderColor(path: string): Color {
-  return new Color(`hsl(${hashPath(path) % 360},35%,42%)`);
-}
 
 export function buildExtColorMap(extCounts: Map<string, number>): Map<string, Color> {
   const GOLDEN = 0.61803398875;
@@ -70,11 +67,14 @@ export function buildExtColorMap(extCounts: Map<string, number>): Map<string, Co
 const VERT = /* glsl */`
   attribute float aSize;
   attribute vec3  aColor;
+  attribute float aIsFolder;
   varying   vec3  vColor;
+  varying   float vIsFolder;
   uniform   float uPixelRatio;
 
   void main() {
-    vColor = aColor;
+    vColor    = aColor;
+    vIsFolder = aIsFolder;
     vec4 mv      = modelViewMatrix * vec4(position, 1.0);
     gl_PointSize = aSize * uPixelRatio;
     gl_Position  = projectionMatrix * mv;
@@ -84,14 +84,15 @@ const VERT = /* glsl */`
 const FRAG = /* glsl */`
   uniform float uOpacity;
   varying vec3  vColor;
+  varying float vIsFolder;
 
   void main() {
-    // Circular disc with soft edge
     vec2  uv = gl_PointCoord - vec2(0.5);
     float r  = dot(uv, uv);
     if (r > 0.25) discard;
-    float alpha = (1.0 - smoothstep(0.18, 0.25, r)) * uOpacity;
-    gl_FragColor = vec4(vColor, alpha);
+    // Folders: hollow ring (discard inner 55% of radius)
+    if (vIsFolder > 0.5 && r < 0.075) discard;
+    gl_FragColor = vec4(vColor, uOpacity);
     #include <colorspace_fragment>
   }
 `;
@@ -270,11 +271,41 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
       extCounts.set(ext, (extCounts.get(ext) ?? 0) + 1);
     }
     const colorMap = buildExtColorMap(extCounts);
-    this.colorOf   = (n: PositionedNode): Color => {
-      if (!n.isFile) return folderColor(n.path);
-      const dot = n.path.lastIndexOf('.');
-      if (dot < 0 || dot === n.path.length - 1) return new Color('#8892a4');
-      return colorMap.get(n.path.slice(dot + 1).toLowerCase()) ?? new Color('#8892a4');
+
+    // Helper: file color by extension
+    const fileColor = (path: string): Color => {
+      const dot = path.lastIndexOf('.');
+      if (dot < 0 || dot === path.length - 1) return new Color('#8892a4');
+      return colorMap.get(path.slice(dot + 1).toLowerCase()) ?? new Color('#8892a4');
+    };
+
+    // Build parent → direct children map
+    const childrenOf = new Map<string, PositionedNode[]>();
+    for (const n of nodes) {
+      const parentPath = n.path.includes('/') ? n.path.substring(0, n.path.lastIndexOf('/')) : '';
+      if (!childrenOf.has(parentPath)) childrenOf.set(parentPath, []);
+      childrenOf.get(parentPath)!.push(n);
+    }
+
+    // Bottom-up: average children's colors into each folder (deepest folders first)
+    const folderColorMap = new Map<string, Color>();
+    const folders = nodes.filter(n => !n.isFile)
+      .sort((a, b) => b.path.split('/').length - a.path.split('/').length);
+
+    for (const folder of folders) {
+      const children = childrenOf.get(folder.path) ?? [];
+      if (!children.length) { folderColorMap.set(folder.path, new Color('#8892a4')); continue; }
+      let r = 0, g = 0, b = 0;
+      for (const child of children) {
+        const c = child.isFile ? fileColor(child.path) : (folderColorMap.get(child.path) ?? new Color('#8892a4'));
+        r += c.r; g += c.g; b += c.b;
+      }
+      folderColorMap.set(folder.path, new Color(r / children.length, g / children.length, b / children.length));
+    }
+
+    this.colorOf = (n: PositionedNode): Color => {
+      if (!n.isFile) return folderColorMap.get(n.path) ?? new Color('#8892a4');
+      return fileColor(n.path);
     };
     const colorOf = this.colorOf;
 
@@ -317,6 +348,7 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
     const pos = new Float32Array(n * 3);
     const col = new Float32Array(n * 3);
     const siz = new Float32Array(n);
+    const fld = new Float32Array(n);
 
     for (let i = 0; i < n; i++) {
       const node = subset[i];
@@ -328,12 +360,14 @@ export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
       col[i * 3 + 1] = c.g;
       col[i * 3 + 2] = c.b;
       siz[i] = toSize(node.isFile ? (node.fileSize ?? 0) : node.subtreeBytes);
+      fld[i] = node.isFile ? 0 : 1;
     }
 
     const geo = new BufferGeometry();
-    geo.setAttribute('position', new BufferAttribute(pos, 3));
-    geo.setAttribute('aColor',   new BufferAttribute(col, 3));
-    geo.setAttribute('aSize',    new BufferAttribute(siz, 1));
+    geo.setAttribute('position',  new BufferAttribute(pos, 3));
+    geo.setAttribute('aColor',    new BufferAttribute(col, 3));
+    geo.setAttribute('aSize',     new BufferAttribute(siz, 1));
+    geo.setAttribute('aIsFolder', new BufferAttribute(fld, 1));
     geo.userData['nodes'] = subset;
 
     const mat = new ShaderMaterial({

@@ -63,7 +63,7 @@ export interface DisplayOptions {
 }
 
 export const DEFAULT_DISPLAY_OPTIONS: DisplayOptions = {
-  showFolders: false,
+  showFolders: true,
   showFiles: true,
   showConnectors: true,
   connectorOpacity: 0.8,
