@@ -5,6 +5,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSliderModule } from '@angular/material/slider';
+import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Subject, debounceTime, takeUntil } from 'rxjs';
 import { DEFAULT_DISPLAY_OPTIONS, DEFAULT_LAYOUT_PARAMS, DisplayOptions, LayoutParams, LoadingState } from '../../../shared/models/tree-node.model';
@@ -22,6 +23,7 @@ export interface RepoSubmitEvent {
     MatButtonModule,
     MatCheckboxModule,
     MatSliderModule,
+    MatIconModule,
     MatTooltipModule,
   ],
   templateUrl: './controls-panel.html',

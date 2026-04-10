@@ -9,12 +9,16 @@ $text-dim: #8899aa;
 
 .panel {
   width: 260px;
-  background: $bg;
+  max-height: calc(100vh - 24px);
+  display: flex;
+  flex-direction: column;
+  background: rgba(18, 21, 28, 0.92);
+  backdrop-filter: blur(8px);
   overflow: hidden;
   transition: width 0.2s ease;
 
   &.collapsed {
-    width: 40px;
+    width: 36px;
   }
 }
 
@@ -25,6 +29,12 @@ $text-dim: #8899aa;
   padding: 10px 12px;
   border-bottom: 1px solid $border;
   white-space: nowrap;
+
+  .collapsed & {
+    justify-content: center;
+    padding: 10px 0;
+    border-bottom: none;
+  }
 }
 
 .panel-title {
@@ -34,12 +44,7 @@ $text-dim: #8899aa;
 }
 
 .collapse-btn {
-  background: none;
-  border: none;
   color: $text-dim;
-  cursor: pointer;
-  font-size: 14px;
-  padding: 0 2px;
   flex-shrink: 0;
 
   &:hover { color: $text; }
@@ -51,7 +56,8 @@ $text-dim: #8899aa;
   flex-direction: column;
   gap: 16px;
   overflow-y: auto;
-  max-height: calc(100vh - 44px);
+  flex: 1;
+  min-height: 0;
 }
 
 .section {
