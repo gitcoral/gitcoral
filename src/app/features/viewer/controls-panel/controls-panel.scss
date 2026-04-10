@@ -107,6 +107,7 @@ $accent:   #4a90d9;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow: clip;
 }
 
 .slider-meta {
