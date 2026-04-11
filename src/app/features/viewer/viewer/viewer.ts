@@ -5,11 +5,11 @@ import { GithubService } from '../../../core/services/github';
 import { LayoutService } from '../../../core/services/layout';
 import { DEFAULT_DISPLAY_OPTIONS, DEFAULT_LAYOUT_PARAMS, DisplayOptions, LayoutParams, LoadingState, TreeStructure } from '../../../shared/models/tree-node.model';
 import { ControlsPanel, RepoSubmitEvent } from '../controls-panel/controls-panel';
-import { PlotlyCanvas } from '../plotly-canvas/plotly-canvas';
+import { ThreeCanvas } from '../three-canvas/three-canvas';
 
 @Component({
   selector: 'app-viewer',
-  imports: [ControlsPanel, PlotlyCanvas],
+  imports: [ControlsPanel, ThreeCanvas],
   templateUrl: './viewer.html',
   styleUrl: './viewer.scss',
 })

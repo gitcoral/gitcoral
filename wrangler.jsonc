@@ -1,12 +1,12 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "code-orb",
+  "name": "gitcoral",
   "compatibility_date": "2025-09-27",
   "observability": {
     "enabled": true
   },
   "assets": {
-    "directory": "dist/code-orb/browser"
+    "directory": "dist/gitcoral/browser"
   },
   "compatibility_flags": [
     "nodejs_compat"

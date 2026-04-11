@@ -26,7 +26,7 @@ export class GithubService {
   private readonly BASE = 'https://api.github.com';
   private readonly HEADERS: Record<string, string> = {
     'Accept': 'application/vnd.github+json',
-    'User-Agent': 'code-orb',
+    'User-Agent': 'gitcoral',
   };
 
   parseRepoUrl(url: string): { owner: string; repo: string } | null {

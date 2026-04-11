@@ -102,11 +102,11 @@ const FRAG = /* glsl */`
 // ---------------------------------------------------------------------------
 
 @Component({
-  selector: 'app-plotly-canvas',
+  selector: 'app-three-canvas',
   template: `<canvas #canvas style="display:block;width:100%;height:100%;"></canvas>`,
   styles: [`:host { display: block; width: 100%; height: 100%; background: #0c0e12; }`],
 })
-export class PlotlyCanvas implements OnInit, OnChanges, OnDestroy {
+export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
   @Input() result: LayoutResult | null = null;
   @Input() resetCamera = false;

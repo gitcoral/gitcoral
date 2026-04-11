@@ -7,7 +7,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "code-orb": {
+    "gitcoral": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -62,10 +62,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "code-orb:build:production"
+              "buildTarget": "gitcoral:build:production"
             },
             "development": {
-              "buildTarget": "code-orb:build:development"
+              "buildTarget": "gitcoral:build:development"
             }
           },
           "defaultConfiguration": "development"
