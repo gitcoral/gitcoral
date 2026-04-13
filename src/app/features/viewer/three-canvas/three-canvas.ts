@@ -314,9 +314,9 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       ...(this.display.showFolders ? nodes.filter(n => !n.isFile) : []),
       ...(this.display.showFiles   ? nodes.filter(n =>  n.isFile) : []),
     ];
-    // Size scale (cbrt, shared across folders+files)
+    // Size scale (cbrt) — derived from ALL nodes so toggling visibility doesn't rescale dots
     const { dotMin, dotMax } = this.display;
-    const cbrtAll   = visible.map(n => Math.cbrt(n.isFile ? (n.fileSize ?? 0) : n.subtreeBytes));
+    const cbrtAll   = nodes.map(n => Math.cbrt(n.isFile ? (n.fileSize ?? 0) : n.subtreeBytes));
     const cbrtMin   = Math.min(...cbrtAll, 0);
     const cbrtMax   = Math.max(...cbrtAll, 1);
     const cbrtRange = cbrtMax - cbrtMin || 1;

@@ -31,11 +31,13 @@
           [class.fetching]="status === 'fetching'"
           [class.computing]="status === 'computing'"
         >
-          @switch (status) {
-            @case ('fetching')  { <span class="btn-spinner"></span> Fetching… }
-            @case ('computing') { <span class="btn-spinner"></span> Rendering… }
-            @default            { Render }
-          }
+          <span class="btn-content">
+            @switch (status) {
+              @case ('fetching')  { <span class="btn-spinner"></span> Fetching… }
+              @case ('computing') { <span class="btn-spinner"></span> Rendering… }
+              @default            { Render }
+            }
+          </span>
         </button>
       </section>
 
