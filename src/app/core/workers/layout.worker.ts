@@ -105,7 +105,6 @@ interface LayoutNode {
   y: number;
   z: number;
   connectionWidth: number;
-  nodeSize: number;
 }
 
 const GOLDEN_F = Math.PI * (3 - Math.sqrt(5)); // golden-angle step for Fibonacci sphere
@@ -121,7 +120,6 @@ function toLayoutNode(src: TreeStructure): LayoutNode {
     children: src.children.map(toLayoutNode),
     x: 0, y: 0, z: 0,
     connectionWidth: 0,
-    nodeSize: 0,
   };
 }
 
@@ -141,8 +139,7 @@ export function layoutTree(root: TreeStructure, params: LayoutParams): Positione
   const { layerHeight, zScale, buoyancy, repulsion, decay, dotD } = params;
 
   const layoutRoot  = toLayoutNode(root);
-  const maxSubtree  = layoutRoot.subtreeFiles ?? 1;
-  const maxFileSize = maxFileSizeInTree(layoutRoot);
+  const maxSubtree  = layoutRoot.subtreeBytes ?? 1;
 
   function place(n: LayoutNode, hintAngle: number, conn: number): void {
     const px = n.x, py = n.y, pz = n.z;
@@ -171,18 +168,12 @@ export function layoutTree(root: TreeStructure, params: LayoutParams): Positione
       sf.y = Math.abs(y) < SNAP ? 0 : y;
       sf.z = pz + h * zScale;
 
-      // connectionWidth: log-normalised subtree weight × depth penalty → 6 visual buckets.
-      // Stepped (not continuous) so Plotly edge-batching produces fewer distinct trace widths.
-      const depth     = sf.path.split('/').length;
-      const tSubtree  = Math.log1p(sf.subtreeFiles) / Math.log1p(maxSubtree);
-      const tDepth    = 1 / Math.sqrt(depth + 1);
-      const t         = tSubtree * tDepth;
+      // connectionWidth: log-normalised subtreeBytes → 6 visual buckets.
+      // Stepped (not continuous) so edge-batching produces fewer distinct LineMaterial instances.
+      const t = Math.log1p(sf.subtreeBytes) / Math.log1p(maxSubtree);
       const N_BUCKETS = 6;
       const bucket    = Math.min(N_BUCKETS - 1, Math.floor(t * N_BUCKETS));
       sf.connectionWidth = 2 + (12 - 2) * bucket / (N_BUCKETS - 1);
-
-      // nodeSize: log-compressed subtree count
-      sf.nodeSize = Math.max(5, 5 + 4 * Math.min(2, Math.log1p(sf.subtreeFiles)));
 
       // h * decay: vertical displacement of this node becomes the sphere radius for its
       // children — tighter sphere the deeper we go, floored to avoid vanishing connectors.
@@ -204,8 +195,6 @@ export function layoutTree(root: TreeStructure, params: LayoutParams): Positione
         f.y = py + cloudR * sinT * Math.sin(phiF);
         f.z = pz + cloudR * cosT;
 
-        const sz = f.fileSize ?? 0;
-        f.nodeSize        = 1.5 + 4.5 * Math.log1p(sz) / Math.log1p(Math.max(maxFileSize, 1));
         f.connectionWidth = 0; // files have no connector
       }
     }
@@ -213,17 +202,6 @@ export function layoutTree(root: TreeStructure, params: LayoutParams): Positione
 
   place(layoutRoot, 0, layerHeight);
   return flattenLayoutTree(layoutRoot);
-}
-
-function maxFileSizeInTree(node: LayoutNode): number {
-  let max = 0;
-  const stack: LayoutNode[] = [node];
-  while (stack.length) {
-    const n = stack.pop()!;
-    if (n.isFile && (n.fileSize ?? 0) > max) max = n.fileSize!;
-    stack.push(...n.children);
-  }
-  return max;
 }
 
 // ---------------------------------------------------------------------------

@@ -24,7 +24,6 @@ export interface PositionedNode {
   y: number;
   z: number;
   connectionWidth: number; // 0 for files
-  nodeSize: number;
 }
 
 // ---------------------------------------------------------------------------

@@ -140,23 +140,6 @@ describe('layoutTree', () => {
     expect(src.connectionWidth).toBeLessThanOrEqual(12);
   });
 
-  it('folder nodeSize is at least 5', () => {
-    const tree  = makeFolder('', 1, [makeFolder('src', 1, [makeFile('src/a.ts')])]);
-    const nodes = layoutTree(tree, PARAMS);
-    expect(byPath(nodes, 'src').nodeSize).toBeGreaterThanOrEqual(5);
-  });
-
-  it('file nodeSize is at least 1.5', () => {
-    const nodes = layoutTree(makeFolder('', 1, [makeFile('a.ts', 500)]), PARAMS);
-    expect(byPath(nodes, 'a.ts').nodeSize).toBeGreaterThanOrEqual(1.5);
-  });
-
-  it('file nodeSize is larger for a bigger file', () => {
-    const tree  = makeFolder('', 2, [makeFile('small.ts', 10), makeFile('large.ts', 100_000)]);
-    const nodes = layoutTree(tree, PARAMS);
-    expect(byPath(nodes, 'large.ts').nodeSize).toBeGreaterThan(byPath(nodes, 'small.ts').nodeSize);
-  });
-
   it('single subfolder is placed at non-zero distance from root', () => {
     const tree  = makeFolder('', 1, [makeFolder('src', 1, [makeFile('src/a.ts')])]);
     const nodes = layoutTree(tree, PARAMS);
