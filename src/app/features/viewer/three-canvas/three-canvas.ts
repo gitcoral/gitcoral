@@ -310,9 +310,10 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const colorOf = this.colorOf;
 
     // Visible node list
+    const { fileSizeMin, fileSizeMax } = this.display;
     const visible: PositionedNode[] = [
       ...(this.display.showFolders ? nodes.filter(n => !n.isFile) : []),
-      ...(this.display.showFiles   ? nodes.filter(n =>  n.isFile) : []),
+      ...(this.display.showFiles   ? nodes.filter(n => n.isFile && (n.fileSize ?? 0) >= fileSizeMin && (n.fileSize ?? 0) <= fileSizeMax) : []),
     ];
     // Separate size scales for files and folders so each uses its own cbrt range.
     // Files are normalized against file sizes only — gives full fileDotMin–fileDotMax spread.

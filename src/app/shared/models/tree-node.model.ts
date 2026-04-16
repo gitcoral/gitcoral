@@ -61,6 +61,8 @@ export interface DisplayOptions {
   fileDotMax: number;
   folderDotMin: number;
   folderDotMax: number;
+  fileSizeMin: number;
+  fileSizeMax: number;
 }
 
 export const DEFAULT_DISPLAY_OPTIONS: DisplayOptions = {
@@ -75,6 +77,8 @@ export const DEFAULT_DISPLAY_OPTIONS: DisplayOptions = {
   fileDotMax: 20.0,
   folderDotMin: 2.0,
   folderDotMax: 10.0,
+  fileSizeMin: 0,
+  fileSizeMax: Number.MAX_SAFE_INTEGER,
 };
 
 export interface LayoutResult {

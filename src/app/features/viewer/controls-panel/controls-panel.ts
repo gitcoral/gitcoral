@@ -33,6 +33,7 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
 
   @Input() status: LoadingState = 'idle';
   @Input() initialRepo = '';
+  @Input() maxFileSize = 0;
   @Output() repoSubmit     = new EventEmitter<RepoSubmitEvent>();
   @Output() paramsChange   = new EventEmitter<LayoutParams>();
   @Output() displayChange  = new EventEmitter<DisplayOptions>();
@@ -41,6 +42,10 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
   params: LayoutParams = { ...DEFAULT_LAYOUT_PARAMS };
   display: DisplayOptions = { ...DEFAULT_DISPLAY_OPTIONS };
   collapsed = false;
+
+  // Log-scale slider positions (0–1000); converted to bytes on change.
+  fileSizePosMin = 0;
+  fileSizePosMax = 1000;
 
   readonly displayOptions: Array<{ key: keyof DisplayOptions; label: string }> = [
     { key: 'showFolders',    label: 'Folders'    },
@@ -75,6 +80,13 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
     if (changes['initialRepo'] && this.initialRepo && !this.repoUrl) {
       this.repoUrl = this.initialRepo;
     }
+    if (changes['maxFileSize'] && this.maxFileSize > 0) {
+      this.fileSizePosMin = 0;
+      this.fileSizePosMax = 1000;
+      this.display.fileSizeMin = 0;
+      this.display.fileSizeMax = this.maxFileSize;
+      this.displayChange.emit({ ...this.display });
+    }
   }
 
   ngOnDestroy(): void {
@@ -98,6 +110,24 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
   onSubmit(): void {
     const url = this.repoUrl.trim();
     if (url) this.repoSubmit.emit({ url });
+  }
+
+  onFileSizeChange(): void {
+    this.display.fileSizeMin = this.posToBytes(this.fileSizePosMin);
+    this.display.fileSizeMax = this.posToBytes(this.fileSizePosMax);
+    this.displayChange.emit({ ...this.display });
+  }
+
+  formatBytes(b: number): string {
+    if (b >= 1_000_000) return (b / 1_000_000).toFixed(1).replace(/\.0$/, '') + ' MB';
+    if (b >= 1_000)     return (b / 1_000).toFixed(1).replace(/\.0$/, '') + ' KB';
+    return b + ' B';
+  }
+
+  private posToBytes(pos: number): number {
+    if (pos <= 0) return 0;
+    if (pos >= 1000) return this.maxFileSize;
+    return Math.round(Math.exp(pos / 1000 * Math.log(this.maxFileSize + 1)) - 1);
   }
 
   toggleCollapse(): void {

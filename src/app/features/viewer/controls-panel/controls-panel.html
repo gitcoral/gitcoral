@@ -94,6 +94,20 @@
             <input matSliderEndThumb [(ngModel)]="display.folderDotMax" (ngModelChange)="onDisplayChange()" />
           </mat-slider>
         </div>
+
+        @if (maxFileSize > 0) {
+          <div class="slider-row">
+            <div class="slider-meta">
+              <span class="slider-label">File size</span>
+              <span class="slider-value">{{ formatBytes(display.fileSizeMin) }} – {{ formatBytes(display.fileSizeMax) }}</span>
+            </div>
+            <mat-slider min="0" max="1000" step="1">
+              <input matSliderStartThumb [(ngModel)]="fileSizePosMin" (ngModelChange)="onFileSizeChange()" />
+              <input matSliderEndThumb [(ngModel)]="fileSizePosMax" (ngModelChange)="onFileSizeChange()" />
+            </mat-slider>
+          </div>
+        }
+
       </section>
 
       <!-- Layout sliders -->

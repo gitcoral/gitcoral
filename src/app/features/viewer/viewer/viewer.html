@@ -8,6 +8,7 @@
     <app-controls-panel
       [status]="status()"
       [initialRepo]="initialRepo"
+      [maxFileSize]="maxFileSize"
       (repoSubmit)="onRepoSubmit($event)"
       (paramsChange)="onParamsChange($event)"
       (displayChange)="display = $event"

@@ -23,6 +23,12 @@ export class Viewer implements OnInit {
   get result() { return this.layout.result; }
   get error()  { return this.layout.error; }
 
+  get maxFileSize(): number {
+    const nodes = this.layout.result()?.nodes;
+    if (!nodes) return 0;
+    return Math.max(0, ...nodes.filter(n => n.isFile).map(n => n.fileSize ?? 0));
+  }
+
   private rawRoot: TreeStructure | null = null;
   private repoName = '';
   private params: LayoutParams = { ...DEFAULT_LAYOUT_PARAMS };
