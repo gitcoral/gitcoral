@@ -168,9 +168,9 @@ export function layoutTree(root: TreeStructure, params: LayoutParams): Positione
       sf.y = Math.abs(y) < SNAP ? 0 : y;
       sf.z = pz + h * zScale;
 
-      // connectionWidth: log-normalised subtreeBytes → 6 visual buckets.
+      // connectionWidth: cbrt-normalised subtreeBytes → 6 visual buckets.
       // Stepped (not continuous) so edge-batching produces fewer distinct LineMaterial instances.
-      const t = Math.log1p(sf.subtreeBytes) / Math.log1p(maxSubtree);
+      const t = Math.cbrt(sf.subtreeBytes) / Math.cbrt(maxSubtree);
       const N_BUCKETS = 6;
       const bucket    = Math.min(N_BUCKETS - 1, Math.floor(t * N_BUCKETS));
       sf.connectionWidth = 2 + (12 - 2) * bucket / (N_BUCKETS - 1);

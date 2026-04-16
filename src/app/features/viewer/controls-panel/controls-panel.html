@@ -54,10 +54,11 @@
         <div class="slider-row">
           <div class="slider-meta">
             <span class="slider-label">Connector opacity</span>
-            <span class="slider-value">{{ display.connectorOpacity }}</span>
+            <span class="slider-value">{{ display.connectorOpacityMin }} – {{ display.connectorOpacityMax }}</span>
           </div>
-          <mat-slider min="0" max="1" step="0.05">
-            <input matSliderThumb [(ngModel)]="display.connectorOpacity" (ngModelChange)="onDisplayChange()" />
+          <mat-slider min="0.1" max="0.9" step="0.05">
+            <input matSliderStartThumb [(ngModel)]="display.connectorOpacityMin" (ngModelChange)="onDisplayChange()" />
+            <input matSliderEndThumb [(ngModel)]="display.connectorOpacityMax" (ngModelChange)="onDisplayChange()" />
           </mat-slider>
         </div>
 
@@ -74,19 +75,25 @@
 
         <div class="slider-row">
           <div class="slider-meta">
-            <span class="slider-label">Dot size</span>
-            <span class="slider-value">{{ display.dotMin }} – {{ display.dotMax }}</span>
+            <span class="slider-label">File dot size</span>
+            <span class="slider-value">{{ display.fileDotMin }} – {{ display.fileDotMax }}</span>
           </div>
           <mat-slider min="1" max="30" step="0.5">
-            <input matSliderStartThumb [(ngModel)]="display.dotMin" (ngModelChange)="onDisplayChange()" />
-            <input matSliderEndThumb [(ngModel)]="display.dotMax" (ngModelChange)="onDisplayChange()" />
+            <input matSliderStartThumb [(ngModel)]="display.fileDotMin" (ngModelChange)="onDisplayChange()" />
+            <input matSliderEndThumb [(ngModel)]="display.fileDotMax" (ngModelChange)="onDisplayChange()" />
           </mat-slider>
         </div>
-      </section>
 
-      <!-- Interaction hint -->
-      <section class="section">
-        <p class="hint">Click a file or folder to focus it and dim the rest. Click again or click empty space to reset.</p>
+        <div class="slider-row">
+          <div class="slider-meta">
+            <span class="slider-label">Folder dot size</span>
+            <span class="slider-value">{{ display.folderDotMin }} – {{ display.folderDotMax }}</span>
+          </div>
+          <mat-slider min="1" max="30" step="0.5">
+            <input matSliderStartThumb [(ngModel)]="display.folderDotMin" (ngModelChange)="onDisplayChange()" />
+            <input matSliderEndThumb [(ngModel)]="display.folderDotMax" (ngModelChange)="onDisplayChange()" />
+          </mat-slider>
+        </div>
       </section>
 
       <!-- Layout sliders -->

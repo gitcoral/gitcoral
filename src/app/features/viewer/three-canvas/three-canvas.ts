@@ -314,14 +314,27 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       ...(this.display.showFolders ? nodes.filter(n => !n.isFile) : []),
       ...(this.display.showFiles   ? nodes.filter(n =>  n.isFile) : []),
     ];
-    // Size scale (cbrt) — derived from ALL nodes so toggling visibility doesn't rescale dots
-    const { dotMin, dotMax } = this.display;
-    const cbrtAll   = nodes.map(n => Math.cbrt(n.isFile ? (n.fileSize ?? 0) : n.subtreeBytes));
-    const cbrtMin   = Math.min(...cbrtAll, 0);
-    const cbrtMax   = Math.max(...cbrtAll, 1);
-    const cbrtRange = cbrtMax - cbrtMin || 1;
-    const toSize    = (bytes: number) =>
-      dotMin + (dotMax - dotMin) * (Math.cbrt(bytes) - cbrtMin) / cbrtRange;
+    // Separate size scales for files and folders so each uses its own cbrt range.
+    // Files are normalized against file sizes only — gives full fileDotMin–fileDotMax spread.
+    // Folders are normalized against subtreeBytes with their own range.
+    const { fileDotMin, fileDotMax } = this.display;
+    const fileCbrt    = nodes.filter(n => n.isFile).map(n => Math.cbrt(n.fileSize ?? 0));
+    const fileCbrtMin = Math.min(...fileCbrt, 0);
+    const fileCbrtMax = Math.max(...fileCbrt, 1);
+    const fileCbrtRange = fileCbrtMax - fileCbrtMin || 1;
+    const toFileSize  = (bytes: number) =>
+      fileDotMin + (fileDotMax - fileDotMin) * (Math.cbrt(bytes) - fileCbrtMin) / fileCbrtRange;
+
+    const { folderDotMin, folderDotMax } = this.display;
+    const folderCbrt    = nodes.filter(n => !n.isFile).map(n => Math.cbrt(n.subtreeBytes));
+    const folderCbrtMin = Math.min(...folderCbrt, 0);
+    const folderCbrtMax = Math.max(...folderCbrt, 1);
+    const folderCbrtRange = folderCbrtMax - folderCbrtMin || 1;
+    const toFolderSize = (bytes: number) =>
+      folderDotMin + (folderDotMax - folderDotMin) * (Math.cbrt(bytes) - folderCbrtMin) / folderCbrtRange;
+
+    const toSize = (n: PositionedNode) =>
+      n.isFile ? toFileSize(n.fileSize ?? 0) : toFolderSize(n.subtreeBytes);
 
     // Split focused / dimmed
     const focused = focusSet ? visible.filter(n =>  inFocus(n.path)) : visible;
@@ -342,7 +355,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     subset: PositionedNode[],
     opacity: number,
     colorOf: (n: PositionedNode) => Color,
-    toSize:  (bytes: number) => number,
+    toSize:  (n: PositionedNode) => number,
   ): void {
     const n   = subset.length;
     const pos = new Float32Array(n * 3);
@@ -359,7 +372,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       col[i * 3]     = c.r;
       col[i * 3 + 1] = c.g;
       col[i * 3 + 2] = c.b;
-      siz[i] = toSize(node.isFile ? (node.fileSize ?? 0) : node.subtreeBytes);
+      siz[i] = toSize(node);
       fld[i] = node.isFile ? 0 : 1;
     }
 
@@ -418,8 +431,9 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       const focused    = inFocus(node.path) && inFocus(parentPath);
       const depthBucket = Math.min(
         Math.floor((node.z - zMin) / zRange * DEPTH_BUCKETS), DEPTH_BUCKETS - 1);
+      const { connectorOpacityMin, connectorOpacityMax } = this.display;
       const depthAlpha  = focused
-        ? 0.8 - 0.65 * (depthBucket / (DEPTH_BUCKETS - 1))  // 0.8 → 0.15
+        ? connectorOpacityMax - (connectorOpacityMax - connectorOpacityMin) * (depthBucket / (DEPTH_BUCKETS - 1))
         : DIM;
       const W_IN_MIN = 2, W_IN_MAX = 12;
       const t = Math.max(0, Math.min(1, (node.connectionWidth - W_IN_MIN) / (W_IN_MAX - W_IN_MIN)));
@@ -441,7 +455,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       const mat = new LineMaterial({
         vertexColors:        true,
         transparent:         true,
-        opacity:             this.display.connectorOpacity * depthAlpha,
+        opacity:             depthAlpha,
         linewidth:           width,
         depthWrite:          false,
         resolution:          new Vector2(canvas.clientWidth, canvas.clientHeight),

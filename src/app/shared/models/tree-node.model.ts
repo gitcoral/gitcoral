@@ -54,22 +54,28 @@ export interface DisplayOptions {
   showFolders: boolean;
   showFiles: boolean;
   showConnectors: boolean;
-  connectorOpacity: number;
+  connectorOpacityMin: number;
+  connectorOpacityMax: number;
   connectorWidthMin: number;
   connectorWidthMax: number;
-  dotMin: number;
-  dotMax: number;
+  fileDotMin: number;
+  fileDotMax: number;
+  folderDotMin: number;
+  folderDotMax: number;
 }
 
 export const DEFAULT_DISPLAY_OPTIONS: DisplayOptions = {
   showFolders: true,
   showFiles: true,
   showConnectors: true,
-  connectorOpacity: 0.8,
+  connectorOpacityMin: 0.1,
+  connectorOpacityMax: 0.8,
   connectorWidthMin: 1,
   connectorWidthMax: 10,
-  dotMin: 4.0,
-  dotMax: 20.0,
+  fileDotMin: 4.0,
+  fileDotMax: 20.0,
+  folderDotMin: 2.0,
+  folderDotMax: 10.0,
 };
 
 export interface LayoutResult {
