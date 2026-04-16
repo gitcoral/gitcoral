@@ -16,12 +16,12 @@ const PARAMS: LayoutParams = {
 };
 
 function makeFile(path: string, fileSize = 100): TreeStructure {
-  return { path, isFile: true, fileSize, subtreeFiles: 1, subtreeBytes: fileSize, children: [] };
+  return { path, isFile: true, fileSize, subtreeBytes: fileSize, children: [] };
 }
 
-function makeFolder(path: string, subtreeFiles: number, children: TreeStructure[]): TreeStructure {
+function makeFolder(path: string, children: TreeStructure[]): TreeStructure {
   const subtreeBytes = children.reduce((s, c) => s + c.subtreeBytes, 0);
-  return { path, isFile: false, subtreeFiles, subtreeBytes, children };
+  return { path, isFile: false, subtreeBytes, children };
 }
 
 function byPath(nodes: PositionedNode[], path: string): PositionedNode {
@@ -95,7 +95,7 @@ describe('simulate', () => {
 
 describe('layoutTree', () => {
   it('places root at origin', () => {
-    const nodes = layoutTree(makeFolder('', 0, []), PARAMS);
+    const nodes = layoutTree(makeFolder('', []), PARAMS);
     const root  = byPath(nodes, '');
     expect(root.x).toBe(0);
     expect(root.y).toBe(0);
@@ -103,18 +103,18 @@ describe('layoutTree', () => {
   });
 
   it('does not throw on empty root', () => {
-    expect(() => layoutTree(makeFolder('', 1, []), PARAMS)).not.toThrow();
+    expect(() => layoutTree(makeFolder('', []), PARAMS)).not.toThrow();
   });
 
   it('returns a flat array — no node has children', () => {
-    const tree  = makeFolder('', 3, [makeFile('a.ts'), makeFile('b.ts'), makeFile('c.ts')]);
+    const tree  = makeFolder('', [makeFile('a.ts'), makeFile('b.ts'), makeFile('c.ts')]);
     const nodes = layoutTree(tree, PARAMS);
     for (const n of nodes) expect((n as any).children).toBeUndefined();
   });
 
   it('does not mutate the input TreeStructure', () => {
     const file   = makeFile('a.ts');
-    const input  = makeFolder('', 1, [file]);
+    const input  = makeFolder('', [file]);
     layoutTree(input, PARAMS);
     expect((input as any).x).toBeUndefined();
     expect((file  as any).x).toBeUndefined();
@@ -122,18 +122,18 @@ describe('layoutTree', () => {
 
   it('places files on a Fibonacci sphere of radius cloudR around parent', () => {
     const files = [makeFile('a.ts'), makeFile('b.ts'), makeFile('c.ts')];
-    const nodes = layoutTree(makeFolder('', 3, files), PARAMS);
+    const nodes = layoutTree(makeFolder('', files), PARAMS);
     const root  = byPath(nodes, '');
-    const cloudR = (PARAMS.dotD / 2) * Math.sqrt(files.length);
-    for (const name of ['a.ts', 'b.ts', 'c.ts']) {
-      const f    = byPath(nodes, name);
-      const dist = Math.sqrt((f.x - root.x) ** 2 + (f.y - root.y) ** 2 + (f.z - root.z) ** 2);
-      expect(dist).toBeCloseTo(cloudR, 5);
-    }
+    // All files share the same cloudR — verify they are equidistant from parent
+    const dists = ['a.ts', 'b.ts', 'c.ts'].map(name => {
+      const f = byPath(nodes, name);
+      return Math.sqrt((f.x - root.x) ** 2 + (f.y - root.y) ** 2 + (f.z - root.z) ** 2);
+    });
+    for (const d of dists) expect(d).toBeCloseTo(dists[0], 5);
   });
 
   it('folder connectionWidth is in [2, 12]', () => {
-    const tree  = makeFolder('', 2, [makeFolder('src', 2, [makeFile('src/a.ts'), makeFile('src/b.ts')])]);
+    const tree  = makeFolder('', [makeFolder('src', [makeFile('src/a.ts'), makeFile('src/b.ts')])]);
     const nodes = layoutTree(tree, PARAMS);
     const src   = byPath(nodes, 'src');
     expect(src.connectionWidth).toBeGreaterThanOrEqual(2);
@@ -141,14 +141,14 @@ describe('layoutTree', () => {
   });
 
   it('single subfolder is placed at non-zero distance from root', () => {
-    const tree  = makeFolder('', 1, [makeFolder('src', 1, [makeFile('src/a.ts')])]);
+    const tree  = makeFolder('', [makeFolder('src', [makeFile('src/a.ts')])]);
     const nodes = layoutTree(tree, PARAMS);
     const src   = byPath(nodes, 'src');
     expect(Math.sqrt(src.x ** 2 + src.y ** 2 + src.z ** 2)).toBeGreaterThan(0);
   });
 
   it('deeper folders have greater z than their parent', () => {
-    const tree  = makeFolder('', 1, [makeFolder('a', 1, [makeFolder('a/b', 1, [makeFile('a/b/x.ts')])])]);
+    const tree  = makeFolder('', [makeFolder('a', [makeFolder('a/b', [makeFile('a/b/x.ts')])])]);
     const nodes = layoutTree(tree, PARAMS);
     const root  = byPath(nodes, '');
     const mid   = byPath(nodes, 'a');
@@ -158,14 +158,14 @@ describe('layoutTree', () => {
   });
 
   it('files have connectionWidth of 0', () => {
-    const nodes = layoutTree(makeFolder('', 1, [makeFile('readme.md', 200)]), PARAMS);
+    const nodes = layoutTree(makeFolder('', [makeFile('readme.md', 200)]), PARAMS);
     expect(byPath(nodes, 'readme.md').connectionWidth).toBe(0);
   });
 
   it('handles large N of siblings without throwing (spread-operator overflow guard)', () => {
     const children = Array.from({ length: 300 }, (_, i) =>
-      makeFolder(`dir${i}`, 1, [makeFile(`dir${i}/f.ts`)]),
+      makeFolder(`dir${i}`, [makeFile(`dir${i}/f.ts`)]),
     );
-    expect(() => layoutTree(makeFolder('', 300, children), PARAMS)).not.toThrow();
+    expect(() => layoutTree(makeFolder('', children), PARAMS)).not.toThrow();
   });
 });

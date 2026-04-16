@@ -70,10 +70,9 @@ describe('GithubService', () => {
   describe('computeSubtreeStats', () => {
     const svc = () => service as any;
 
-    it('counts a file node as 1 and sets subtreeBytes to fileSize', () => {
+    it('sets subtreeBytes to fileSize for a file node', () => {
       const file = svc().makeNode('a.ts', true, 100);
       svc().computeSubtreeStats(file);
-      expect(file.subtreeFiles).toBe(1);
       expect(file.subtreeBytes).toBe(100);
     });
 
@@ -82,7 +81,6 @@ describe('GithubService', () => {
       root.children.set('a.ts', svc().makeNode('a.ts', true, 10));
       root.children.set('b.ts', svc().makeNode('b.ts', true, 20));
       svc().computeSubtreeStats(root);
-      expect(root.subtreeFiles).toBe(2);
       expect(root.subtreeBytes).toBe(30);
     });
 
@@ -93,14 +91,12 @@ describe('GithubService', () => {
       const root = svc().makeNode('', false);
       root.children.set('src', child);
       svc().computeSubtreeStats(root);
-      expect(root.subtreeFiles).toBe(2);
       expect(root.subtreeBytes).toBe(100);
     });
 
-    it('clamps empty folder file count to minimum of 1', () => {
+    it('empty folder has subtreeBytes of 0', () => {
       const empty = svc().makeNode('empty', false);
       svc().computeSubtreeStats(empty);
-      expect(empty.subtreeFiles).toBe(1);
       expect(empty.subtreeBytes).toBe(0);
     });
   });
@@ -159,15 +155,13 @@ describe('GithubService', () => {
   describe('toTreeNode', () => {
     const svc = () => service as any;
 
-    it('preserves path, isFile, fileSize, subtreeFiles and subtreeBytes', () => {
+    it('preserves path, isFile, fileSize and subtreeBytes', () => {
       const internal = svc().makeNode('src/app.ts', true, 512);
-      internal.subtreeFiles = 1;
       internal.subtreeBytes = 512;
       const node = svc().toTreeNode(internal);
       expect(node.path).toBe('src/app.ts');
       expect(node.isFile).toBe(true);
       expect(node.fileSize).toBe(512);
-      expect(node.subtreeFiles).toBe(1);
       expect(node.subtreeBytes).toBe(512);
     });
 

@@ -6,7 +6,6 @@ export interface TreeStructure {
   path: string;
   isFile: boolean;
   fileSize?: number;       // bytes, files only
-  subtreeFiles: number;    // used by the layout algorithm for weighting
   subtreeBytes: number;    // total bytes under this node (folders) or file size (files)
   children: TreeStructure[];
 }

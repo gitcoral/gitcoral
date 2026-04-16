@@ -98,7 +98,6 @@ interface LayoutNode {
   path: string;
   isFile: boolean;
   fileSize?: number;
-  subtreeFiles: number;
   subtreeBytes: number;
   children: LayoutNode[];
   x: number;
@@ -115,7 +114,6 @@ function toLayoutNode(src: TreeStructure): LayoutNode {
     path: src.path,
     isFile: src.isFile,
     fileSize: src.fileSize,
-    subtreeFiles: src.subtreeFiles,
     subtreeBytes: src.subtreeBytes,
     children: src.children.map(toLayoutNode),
     x: 0, y: 0, z: 0,
@@ -138,25 +136,27 @@ function flattenLayoutTree(root: LayoutNode): PositionedNode[] {
 export function layoutTree(root: TreeStructure, params: LayoutParams): PositionedNode[] {
   const { layerHeight, zScale, buoyancy, repulsion, decay, dotD } = params;
 
-  const layoutRoot  = toLayoutNode(root);
-  const maxSubtree  = layoutRoot.subtreeBytes ?? 1;
+  const layoutRoot      = toLayoutNode(root);
+  const maxSubtree      = layoutRoot.subtreeBytes ?? 1;
+  const maxSubtreeCbrt  = Math.cbrt(maxSubtree);
+  const maxFileCbrt     = maxFileCbrtInTree(layoutRoot);
 
   function place(n: LayoutNode, hintAngle: number, conn: number): void {
     const px = n.x, py = n.y, pz = n.z;
 
     const folders = n.children
       .filter(c => !c.isFile)
-      .sort((a, b) => b.subtreeFiles - a.subtreeFiles);
+      .sort((a, b) => b.subtreeBytes - a.subtreeBytes);
 
-    const coords = simulate(folders.map(f => f.subtreeFiles), buoyancy, repulsion);
-    const maxSf  = folders.reduce((m, f) => Math.max(m, f.subtreeFiles), 1);
+    const coords = simulate(folders.map(f => f.subtreeBytes), buoyancy, repulsion);
+    const maxSb  = folders.reduce((m, f) => Math.max(m, f.subtreeBytes), 1);
 
     for (let i = 0; i < folders.length; i++) {
       const sf = folders[i];
       const [theta, phi] = coords[i];
       const phiG = (phi + hintAngle) % (2 * Math.PI);
 
-      const scale     = 0.3 + 0.7 * Math.log1p(sf.subtreeFiles) / Math.log1p(maxSf);
+      const scale     = 0.3 + 0.7 * Math.log1p(sf.subtreeBytes) / Math.log1p(maxSb);
       const childConn = conn * scale;
       const r = childConn * Math.sin(theta);
       const h = childConn * Math.cos(theta);
@@ -170,7 +170,7 @@ export function layoutTree(root: TreeStructure, params: LayoutParams): Positione
 
       // connectionWidth: cbrt-normalised subtreeBytes → 6 visual buckets.
       // Stepped (not continuous) so edge-batching produces fewer distinct LineMaterial instances.
-      const t = Math.cbrt(sf.subtreeBytes) / Math.cbrt(maxSubtree);
+      const t = Math.cbrt(sf.subtreeBytes) / maxSubtreeCbrt;
       const N_BUCKETS = 6;
       const bucket    = Math.min(N_BUCKETS - 1, Math.floor(t * N_BUCKETS));
       sf.connectionWidth = 2 + (12 - 2) * bucket / (N_BUCKETS - 1);
@@ -181,11 +181,13 @@ export function layoutTree(root: TreeStructure, params: LayoutParams): Positione
       place(sf, phiG, nextSphereRadius);
     }
 
-    // Files — Fibonacci sphere cloud, radius scales with √N to keep visual density stable
+    // Files — Fibonacci sphere cloud, radius scales with √N and average file size
     const files = n.children.filter(c => c.isFile);
     const Nf    = files.length;
     if (Nf > 0) {
-      const cloudR = (dotD / 2) * Math.sqrt(Nf);
+      const avgFileCbrt = files.reduce((s, f) => s + Math.cbrt(f.fileSize ?? 0), 0) / Nf;
+      const sizeScale   = maxFileCbrt > 0 ? avgFileCbrt / maxFileCbrt : 0;
+      const cloudR      = (dotD / 2) * Math.sqrt(Nf) * (1 + sizeScale);
       for (let i = 0; i < Nf; i++) {
         const f    = files[i];
         const cosT = 1 - (2 * i + 1) / Nf;
@@ -202,6 +204,17 @@ export function layoutTree(root: TreeStructure, params: LayoutParams): Positione
 
   place(layoutRoot, 0, layerHeight);
   return flattenLayoutTree(layoutRoot);
+}
+
+function maxFileCbrtInTree(node: LayoutNode): number {
+  let max = 0;
+  const stack: LayoutNode[] = [node];
+  while (stack.length) {
+    const n = stack.pop()!;
+    if (n.isFile) max = Math.max(max, Math.cbrt(n.fileSize ?? 0));
+    stack.push(...n.children);
+  }
+  return max;
 }
 
 // ---------------------------------------------------------------------------

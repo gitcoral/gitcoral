@@ -16,7 +16,6 @@ interface InternalNode {
   isFile: boolean;
   fileSize: number;
   children: Map<string, InternalNode>;
-  subtreeFiles: number;
   subtreeBytes: number;
 }
 
@@ -105,7 +104,7 @@ export class GithubService {
   }
 
   private makeNode(path: string, isFile: boolean, fileSize = 0): InternalNode {
-    return { path, isFile, fileSize, children: new Map(), subtreeFiles: 0, subtreeBytes: 0 };
+    return { path, isFile, fileSize, children: new Map(), subtreeBytes: 0 };
   }
 
   private ensurePath(
@@ -145,15 +144,10 @@ export class GithubService {
     for (let i = order.length - 1; i >= 0; i--) {
       const n = order[i];
       if (n.isFile) {
-        n.subtreeFiles = 1;
         n.subtreeBytes = n.fileSize;
       } else {
-        let files = 0, bytes = 0;
-        for (const child of n.children.values()) {
-          files += child.subtreeFiles;
-          bytes += child.subtreeBytes;
-        }
-        n.subtreeFiles = Math.max(1, files);
+        let bytes = 0;
+        for (const child of n.children.values()) bytes += child.subtreeBytes;
         n.subtreeBytes = bytes;
       }
     }
@@ -175,7 +169,6 @@ export class GithubService {
         path: n.path,
         isFile: n.isFile,
         fileSize: n.isFile ? n.fileSize : undefined,
-        subtreeFiles: n.subtreeFiles,
         subtreeBytes: n.subtreeBytes,
         children: [...n.children.values()].map(c => built.get(c)!),
       });
