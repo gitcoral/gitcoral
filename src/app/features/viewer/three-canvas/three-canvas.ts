@@ -126,6 +126,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
   // Tooltip
   private tipEl!: HTMLDivElement;
+  private tipNodePos: Vector3 | null = null;
   private colorOf: ((n: PositionedNode) => Color) = () => new Color('#8892a4');
 
   // Drag detection
@@ -213,10 +214,21 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   }
 
   private startLoop(): void {
+    const proj = new Vector3();
     const loop = () => {
       this.rafId = requestAnimationFrame(loop);
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
+
+      if (this.tipNodePos && this.tipEl.style.display !== 'none') {
+        const canvas = this.canvasRef.nativeElement;
+        const rect = canvas.getBoundingClientRect();
+        proj.copy(this.tipNodePos).project(this.camera);
+        const sx = (proj.x + 1) / 2 * rect.width  + rect.left;
+        const sy = (-proj.y + 1) / 2 * rect.height + rect.top;
+        this.tipEl.style.left = `${sx + 12}px`;
+        this.tipEl.style.top  = `${sy + 12}px`;
+      }
     };
     loop();
   }
@@ -556,7 +568,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   // Raycasting (hover + click)
   // ---------------------------------------------------------------------------
 
-  private raycast(event: MouseEvent): PositionedNode | null {
+  private raycast(event: MouseEvent): { node: PositionedNode; worldPos: Vector3 } | null {
     const canvas = this.canvasRef.nativeElement;
     const rect   = canvas.getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
@@ -567,7 +579,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     // Screen-space hit test: project each point to CSS pixels and check radius.
     // This is correct for billboard points whose visual size is fixed in pixels
     // regardless of camera distance, unlike a world-space raycaster threshold.
-    let closest: { depth: number; node: PositionedNode } | null = null;
+    let closest: { depth: number; node: PositionedNode; worldPos: Vector3 } | null = null;
     const proj = new Vector3();
 
     for (const obj of this.sceneObjects) {
@@ -578,6 +590,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
       for (let i = 0; i < nodes.length; i++) {
         proj.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
+        const worldPos = proj.clone();
         proj.project(this.camera); // → NDC
 
         if (proj.z > 1) continue; // behind near/far clip
@@ -595,12 +608,12 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
         // Among overlapping points pick the one closest to camera (smallest NDC z)
         if (!closest || proj.z < closest.depth) {
-          closest = { depth: proj.z, node: nodes[i] };
+          closest = { depth: proj.z, node: nodes[i], worldPos };
         }
       }
     }
 
-    return closest?.node ?? null;
+    return closest ? { node: closest.node, worldPos: closest.worldPos } : null;
   }
 
   // ---------------------------------------------------------------------------
@@ -613,8 +626,9 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   }
 
   private _onMouseMove(e: MouseEvent): void {
-    const node = this.raycast(e);
-    if (node) {
+    const hit = this.raycast(e);
+    if (hit) {
+      const { node, worldPos } = hit;
       const hex = '#' + this.colorOf(node).clone().convertLinearToSRGB().getHexString();
       this.tipEl.innerHTML = node.isFile
         ? `<div>${node.path}</div><div>${(node.fileSize ?? 0).toLocaleString()} bytes</div>`
@@ -622,17 +636,18 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       this.tipEl.style.background = hex;
       this.tipEl.style.borderLeft = '';
       this.tipEl.style.display = '';
-      this.tipEl.style.left = `${e.clientX + 12}px`;
-      this.tipEl.style.top  = `${e.clientY + 12}px`;
+      this.tipNodePos = worldPos;
       this.canvasRef.nativeElement.style.cursor = 'pointer';
     } else {
       this.tipEl.style.display = 'none';
+      this.tipNodePos = null;
       this.canvasRef.nativeElement.style.cursor = '';
     }
   }
 
   private _onMouseLeave(): void {
     this.tipEl.style.display = 'none';
+    this.tipNodePos = null;
     this.canvasRef.nativeElement.style.cursor = '';
   }
 
@@ -641,9 +656,9 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const dy = e.clientY - this.mouseDownY;
     if (Math.sqrt(dx * dx + dy * dy) > 4) return; // drag, not click
 
-    const node = this.raycast(e);
-    if (node) {
-      this.focusPath = this.focusPath === node.path ? null : node.path;
+    const hit = this.raycast(e);
+    if (hit) {
+      this.focusPath = this.focusPath === hit.node.path ? null : hit.node.path;
     } else {
       if (this.focusPath === null) return;
       this.focusPath = null;
