@@ -18,7 +18,6 @@ import {
   Object3D,
   PerspectiveCamera,
   Points,
-  LineSegments,
   Scene,
   ShaderMaterial,
   Vector2,
@@ -38,7 +37,7 @@ const DIM = 0.08;
 const BG  = new Color(0x0c0e12);
 
 // ---------------------------------------------------------------------------
-// Colour helpers  (same logic as before)
+// Colour helpers
 // ---------------------------------------------------------------------------
 
 function hashPath(path: string): number {
@@ -260,7 +259,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     // Remove and dispose previous scene objects
     for (const obj of this.sceneObjects) {
       this.scene.remove(obj);
-      if (obj instanceof Points || obj instanceof LineSegments || obj instanceof LineSegments2) {
+      if (obj instanceof Points || obj instanceof LineSegments2) {
         (obj as any).geometry.dispose();
         const mat = (obj as any).material;
         if (Array.isArray(mat)) mat.forEach((m: any) => m.dispose()); else mat.dispose();
@@ -273,10 +272,14 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const focusSet = this.focusPath ? this.buildFocusSet(nodes, this.focusPath) : null;
     const inFocus  = (path: string) => !focusSet || focusSet.has(path);
 
-    // Colour map
+    // Single pass: partition nodes into files and folders
+    const allFiles: PositionedNode[]   = [];
+    const folders: PositionedNode[] = [];
+    for (const n of nodes) (n.isFile ? allFiles : folders).push(n);
+
+    // Colour map — extension → Color
     const extCounts = new Map<string, number>();
-    for (const n of nodes) {
-      if (!n.isFile) continue;
+    for (const n of allFiles) {
       const dot = n.path.lastIndexOf('.');
       if (dot < 0 || dot >= n.path.length - 1) continue;
       const ext = n.path.slice(dot + 1).toLowerCase();
@@ -284,7 +287,6 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     }
     const colorMap = buildExtColorMap(extCounts);
 
-    // Helper: file color by extension
     const fileColor = (path: string): Color => {
       const dot = path.lastIndexOf('.');
       if (dot < 0 || dot === path.length - 1) return new Color('#8892a4');
@@ -301,10 +303,9 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     // Bottom-up: average children's colors into each folder (deepest folders first)
     const folderColorMap = new Map<string, Color>();
-    const folders = nodes.filter(n => !n.isFile)
-      .sort((a, b) => b.path.split('/').length - a.path.split('/').length);
+    const sortedFolders  = [...folders].sort((a, b) => b.path.split('/').length - a.path.split('/').length);
 
-    for (const folder of folders) {
+    for (const folder of sortedFolders) {
       const children = childrenOf.get(folder.path) ?? [];
       if (!children.length) { folderColorMap.set(folder.path, new Color('#8892a4')); continue; }
       let r = 0, g = 0, b = 0;
@@ -315,35 +316,50 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       folderColorMap.set(folder.path, new Color(r / children.length, g / children.length, b / children.length));
     }
 
-    this.colorOf = (n: PositionedNode): Color => {
-      if (!n.isFile) return folderColorMap.get(n.path) ?? new Color('#8892a4');
-      return fileColor(n.path);
-    };
+    this.colorOf = (n: PositionedNode): Color =>
+      n.isFile ? fileColor(n.path) : (folderColorMap.get(n.path) ?? new Color('#8892a4'));
     const colorOf = this.colorOf;
 
-    // Visible node list
+    // Visible files (filtered by size)
     const { fileSizeMin, fileSizeMax } = this.display;
-    const visible: PositionedNode[] = [
-      ...(this.display.showFolders ? nodes.filter(n => !n.isFile) : []),
-      ...(this.display.showFiles   ? nodes.filter(n => n.isFile && (n.fileSize ?? 0) >= fileSizeMin && (n.fileSize ?? 0) <= fileSizeMax) : []),
-    ];
+    const visibleFiles = this.display.showFiles
+      ? allFiles.filter(n => (n.fileSize ?? 0) >= fileSizeMin && (n.fileSize ?? 0) <= fileSizeMax)
+      : [];
+
+    // Mark folders that have at least one visible file anywhere in their subtree
+    const foldersWithContent = new Set<string>();
+    for (const file of visibleFiles) {
+      let p = file.path;
+      while (p.includes('/')) {
+        p = p.substring(0, p.lastIndexOf('/'));
+        foldersWithContent.add(p);
+      }
+    }
+    if (visibleFiles.length) foldersWithContent.add(''); // root
+
+    const visibleFolders = this.display.showFolders
+      ? folders.filter(n => foldersWithContent.has(n.path))
+      : [];
+
+    const visible: PositionedNode[] = [...visibleFolders, ...visibleFiles];
+
     // Separate size scales for files and folders so each uses its own cbrt range.
     // Files are normalized against file sizes only — gives full fileDotMin–fileDotMax spread.
     // Folders are normalized against subtreeBytes with their own range.
     const { fileDotMin, fileDotMax } = this.display;
-    const fileCbrt    = nodes.filter(n => n.isFile).map(n => Math.cbrt(n.fileSize ?? 0));
-    const fileCbrtMin = Math.min(...fileCbrt, 0);
-    const fileCbrtMax = Math.max(...fileCbrt, 1);
+    const fileCbrt      = allFiles.map(n => Math.cbrt(n.fileSize ?? 0));
+    const fileCbrtMin   = Math.min(...fileCbrt, 0);
+    const fileCbrtMax   = Math.max(...fileCbrt, 1);
     const fileCbrtRange = fileCbrtMax - fileCbrtMin || 1;
-    const toFileSize  = (bytes: number) =>
+    const toFileSize    = (bytes: number) =>
       fileDotMin + (fileDotMax - fileDotMin) * (Math.cbrt(bytes) - fileCbrtMin) / fileCbrtRange;
 
     const { folderDotMin, folderDotMax } = this.display;
-    const folderCbrt    = nodes.filter(n => !n.isFile).map(n => Math.cbrt(n.subtreeBytes));
-    const folderCbrtMin = Math.min(...folderCbrt, 0);
-    const folderCbrtMax = Math.max(...folderCbrt, 1);
+    const folderCbrt      = folders.map(n => Math.cbrt(n.subtreeBytes));
+    const folderCbrtMin   = Math.min(...folderCbrt, 0);
+    const folderCbrtMax   = Math.max(...folderCbrt, 1);
     const folderCbrtRange = folderCbrtMax - folderCbrtMin || 1;
-    const toFolderSize = (bytes: number) =>
+    const toFolderSize    = (bytes: number) =>
       folderDotMin + (folderDotMax - folderDotMin) * (Math.cbrt(bytes) - folderCbrtMin) / folderCbrtRange;
 
     const toSize = (n: PositionedNode) =>
@@ -358,9 +374,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     // Edges
     if (this.display.showConnectors) {
-      const allFolders = nodes.filter(n => !n.isFile);
       const nodeByPath = new Map(nodes.map(n => [n.path, n]));
-      this.addEdges(allFolders, nodeByPath, focusSet);
+      this.addEdges(visibleFolders, nodeByPath, focusSet);
     }
   }
 
@@ -415,7 +430,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   }
 
   private addEdges(
-    allFolders: PositionedNode[],
+    folders: PositionedNode[],
     nodeByPath: Map<string, PositionedNode>,
     focusSet: Set<string> | null,
   ): void {
@@ -423,7 +438,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const canvas  = this.canvasRef.nativeElement;
 
     const DEPTH_BUCKETS = 8;
-    const zValues = allFolders.map(n => n.z);
+    const zValues = folders.map(n => n.z);
     const zMin    = Math.min(...zValues, 0);
     const zRange  = Math.max(...zValues, 1) - zMin || 1;
 
@@ -431,7 +446,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     type Batch = { pos: number[]; col: number[]; depthAlpha: number; width: number };
     const batches = new Map<string, Batch>();
 
-    for (const node of allFolders) {
+    for (const node of folders) {
       if (!node.path) continue;
       const parentPath = node.path.includes('/')
         ? node.path.substring(0, node.path.lastIndexOf('/'))
