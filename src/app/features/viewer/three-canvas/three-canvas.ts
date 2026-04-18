@@ -118,19 +118,21 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   private controls!: OrbitControls;
   private rafId = 0;
   private resizeObserver!: ResizeObserver;
-  private focusPath: string | null = null;
-
   // Scene objects — replaced on each rebuildScene()
   private sceneObjects: Object3D[] = [];
+
+  // Selection — drives both scene focus dimming and pinned tooltip
+  private selectedNode: PositionedNode | null = null;
 
   // Tooltip
   private tipEl!: HTMLDivElement;
   private tipNodePos: Vector3 | null = null;
   private colorOf: ((n: PositionedNode) => Color) = () => new Color('#8892a4');
 
-  // Drag detection
+  // Drag / orbit detection
   private mouseDownX = 0;
   private mouseDownY = 0;
+  private isOrbiting = false;
 
   // Bound event handlers (needed for removeEventListener)
   private readonly onMouseMove  = this._onMouseMove.bind(this);
@@ -164,7 +166,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   ngOnChanges(changes: SimpleChanges): void {
     if (!this.renderer) return;
     if (changes['result']) {
-      this.focusPath = null;
+      this.selectedNode = null;
+      this.hideTooltip();
       this.rebuildScene();
       // Always fit on new result — resetCamera=false only suppresses it on param tweaks
       const isFirstLoad = !changes['result'].previousValue;
@@ -210,6 +213,12 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.controls.enableDamping  = true;
     this.controls.dampingFactor  = 0.08;
     this.controls.screenSpacePanning = false;
+    this.controls.addEventListener('start', () => {
+      this.isOrbiting = true;
+      if (!this.selectedNode) this.hideTooltip();
+      this.canvasRef.nativeElement.style.cursor = '';
+    });
+    this.controls.addEventListener('end', () => { this.isOrbiting = false; });
   }
 
   private startLoop(): void {
@@ -269,7 +278,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     if (!this.result) return;
     const nodes    = this.result.nodes;
-    const focusSet = this.focusPath ? this.buildFocusSet(nodes, this.focusPath) : null;
+    const focusSet = this.selectedNode ? this.buildFocusSet(nodes, this.selectedNode.path) : null;
     const inFocus  = (path: string) => !focusSet || focusSet.has(path);
 
     // Single pass: partition nodes into files and folders
@@ -640,43 +649,64 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.mouseDownY = e.clientY;
   }
 
+  private showTooltip(node: PositionedNode, worldPos: Vector3): void {
+    const hex = '#' + this.colorOf(node).clone().convertLinearToSRGB().getHexString();
+    this.tipEl.innerHTML = node.isFile
+      ? `<div>${node.path}</div><div>${(node.fileSize ?? 0).toLocaleString()} bytes</div>`
+      : `<div>${node.path || '(root)'}</div>`;
+    this.tipEl.style.background = hex;
+    this.tipEl.style.display = '';
+    this.tipNodePos = worldPos;
+  }
+
+  private hideTooltip(): void {
+    this.tipEl.style.display = 'none';
+    this.tipNodePos = null;
+  }
+
   private _onMouseMove(e: MouseEvent): void {
+    if (this.isOrbiting) return;
+
+    if (this.selectedNode) {
+      const hit = this.raycast(e);
+      this.canvasRef.nativeElement.style.cursor = hit ? 'pointer' : '';
+      return;
+    }
+
     const hit = this.raycast(e);
     if (hit) {
-      const { node, worldPos } = hit;
-      const hex = '#' + this.colorOf(node).clone().convertLinearToSRGB().getHexString();
-      this.tipEl.innerHTML = node.isFile
-        ? `<div>${node.path}</div><div>${(node.fileSize ?? 0).toLocaleString()} bytes</div>`
-        : `<div>${node.path || '(root)'}</div>`;
-      this.tipEl.style.background = hex;
-      this.tipEl.style.borderLeft = '';
-      this.tipEl.style.display = '';
-      this.tipNodePos = worldPos;
+      this.showTooltip(hit.node, hit.worldPos);
       this.canvasRef.nativeElement.style.cursor = 'pointer';
     } else {
-      this.tipEl.style.display = 'none';
-      this.tipNodePos = null;
+      this.hideTooltip();
       this.canvasRef.nativeElement.style.cursor = '';
     }
   }
 
   private _onMouseLeave(): void {
-    this.tipEl.style.display = 'none';
-    this.tipNodePos = null;
+    if (this.selectedNode) return; // keep pinned tooltip visible
+    this.hideTooltip();
     this.canvasRef.nativeElement.style.cursor = '';
   }
 
   private _onClick(e: MouseEvent): void {
     const dx = e.clientX - this.mouseDownX;
     const dy = e.clientY - this.mouseDownY;
-    if (Math.sqrt(dx * dx + dy * dy) > 4) return; // drag, not click
+    if (dx * dx + dy * dy > 16) return; // drag, not click
 
     const hit = this.raycast(e);
     if (hit) {
-      this.focusPath = this.focusPath === hit.node.path ? null : hit.node.path;
+      const isToggle = this.selectedNode?.path === hit.node.path;
+      this.selectedNode = isToggle ? null : hit.node;
+      if (isToggle) {
+        this.hideTooltip();
+      } else {
+        this.showTooltip(hit.node, hit.worldPos);
+      }
     } else {
-      if (this.focusPath === null) return;
-      this.focusPath = null;
+      if (!this.selectedNode) return;
+      this.selectedNode = null;
+      this.hideTooltip();
     }
     if (this.result) this.rebuildScene();
   }
