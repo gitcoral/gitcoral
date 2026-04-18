@@ -34,6 +34,7 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
   @Input() status: LoadingState = 'idle';
   @Input() initialRepo = '';
   @Input() maxFileSize = 0;
+  @Input() extColors: { ext: string; label: string; color: string; count: number }[] = [];
   @Output() repoSubmit     = new EventEmitter<RepoSubmitEvent>();
   @Output() paramsChange   = new EventEmitter<LayoutParams>();
   @Output() displayChange  = new EventEmitter<DisplayOptions>();
@@ -87,6 +88,33 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
       this.display.fileSizeMax = this.maxFileSize;
       this.displayChange.emit({ ...this.display });
     }
+    if (changes['extColors'] && !changes['extColors'].firstChange) {
+      // New repo loaded — reset hidden extensions
+      this.display.hiddenExtensions = [];
+      this.displayChange.emit({ ...this.display });
+    }
+  }
+
+  isExtHidden(ext: string): boolean {
+    return this.display.hiddenExtensions.includes(ext);
+  }
+
+  toggleExtension(ext: string): void {
+    const hidden = this.display.hiddenExtensions;
+    this.display.hiddenExtensions = hidden.includes(ext)
+      ? hidden.filter(e => e !== ext)
+      : [...hidden, ext];
+    this.displayChange.emit({ ...this.display });
+  }
+
+  selectAllExtensions(): void {
+    this.display.hiddenExtensions = [];
+    this.displayChange.emit({ ...this.display });
+  }
+
+  selectNoneExtensions(): void {
+    this.display.hiddenExtensions = this.extColors.map(e => e.ext);
+    this.displayChange.emit({ ...this.display });
   }
 
   ngOnDestroy(): void {
@@ -116,6 +144,12 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
     this.display.fileSizeMin = this.posToBytes(this.fileSizePosMin);
     this.display.fileSizeMax = this.posToBytes(this.fileSizePosMax);
     this.displayChange.emit({ ...this.display });
+  }
+
+  formatCount(n: number): string {
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 1_000)     return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
+    return String(n);
   }
 
   formatBytes(b: number): string {

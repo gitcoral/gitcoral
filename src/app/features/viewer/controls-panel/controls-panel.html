@@ -108,6 +108,30 @@
           </div>
         }
 
+        @if (extColors.length > 0) {
+          <div class="ext-row">
+            <div class="slider-meta">
+              <span class="slider-label">Extensions</span>
+              <span class="ext-actions">
+                <button class="ext-action-btn" (click)="selectAllExtensions()">All</button>
+                <button class="ext-action-btn" (click)="selectNoneExtensions()">None</button>
+              </span>
+            </div>
+            <div class="ext-chips">
+              @for (e of extColors; track e.ext) {
+                <button
+                  class="ext-chip"
+                  [class.ext-chip--hidden]="isExtHidden(e.ext)"
+                  (click)="toggleExtension(e.ext)"
+                >
+                  <span class="ext-dot" [style.background-color]="e.color"></span>
+                  {{ e.label }}<span class="ext-count">{{ formatCount(e.count) }}</span>
+                </button>
+              }
+            </div>
+          </div>
+        }
+
       </section>
 
       <!-- Layout sliders -->

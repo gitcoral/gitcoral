@@ -1,10 +1,12 @@
 import {
   Component,
   ElementRef,
+  EventEmitter,
   Input,
   OnChanges,
   OnDestroy,
   OnInit,
+  Output,
   SimpleChanges,
   ViewChild,
 } from '@angular/core';
@@ -110,6 +112,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   @Input() result: LayoutResult | null = null;
   @Input() resetCamera = false;
   @Input() display: DisplayOptions = { ...DEFAULT_DISPLAY_OPTIONS };
+  @Output() extColorsChange = new EventEmitter<{ ext: string; label: string; color: string; count: number }[]>();
   @ViewChild('canvas', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
 
   private renderer!: WebGLRenderer;
@@ -128,6 +131,9 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   private tipEl!: HTMLDivElement;
   private tipNodePos: Vector3 | null = null;
   private colorOf: ((n: PositionedNode) => Color) = () => new Color('#8892a4');
+
+  // Track last result for which we emitted extColors
+  private lastEmittedResult: LayoutResult | null = null;
 
   // Drag / orbit detection
   private mouseDownX = 0;
@@ -287,18 +293,43 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     // Colour map — extension → Color
     const extCounts = new Map<string, number>();
+    let noExtCount = 0;
     for (const n of allFiles) {
-      const dot = n.path.lastIndexOf('.');
-      if (dot < 0 || dot >= n.path.length - 1) continue;
-      const ext = n.path.slice(dot + 1).toLowerCase();
+      const filename = n.path.slice(n.path.lastIndexOf('/') + 1);
+      const dot = filename.lastIndexOf('.');
+      if (dot < 0 || dot >= filename.length - 1) { noExtCount++; continue; }
+      const ext = filename.slice(dot + 1).toLowerCase();
       extCounts.set(ext, (extCounts.get(ext) ?? 0) + 1);
     }
     const colorMap = buildExtColorMap(extCounts);
 
+    // Emit extension → CSS color list whenever the result (file set) changes
+    if (this.result !== this.lastEmittedResult) {
+      this.lastEmittedResult = this.result;
+      const extColorsList = [...colorMap.entries()].map(([ext, color]) => ({
+        ext,
+        label: ext,
+        color: '#' + color.clone().convertLinearToSRGB().getHexString(),
+        count: extCounts.get(ext) ?? 0,
+      }));
+      if (noExtCount > 0) {
+        const insertAt = extColorsList.findIndex(e => e.count <= noExtCount);
+        const noneEntry = { ext: '', label: '(none)', color: '#8892a4', count: noExtCount };
+        if (insertAt === -1) extColorsList.push(noneEntry);
+        else extColorsList.splice(insertAt, 0, noneEntry);
+      }
+      this.extColorsChange.emit(extColorsList);
+    }
+
+    const fileExt = (path: string) => {
+      const filename = path.slice(path.lastIndexOf('/') + 1);
+      const dot = filename.lastIndexOf('.');
+      return dot >= 0 && dot < filename.length - 1 ? filename.slice(dot + 1).toLowerCase() : '';
+    };
+
     const fileColor = (path: string): Color => {
-      const dot = path.lastIndexOf('.');
-      if (dot < 0 || dot === path.length - 1) return new Color('#8892a4');
-      return colorMap.get(path.slice(dot + 1).toLowerCase()) ?? new Color('#8892a4');
+      const ext = fileExt(path);
+      return ext ? (colorMap.get(ext) ?? new Color('#8892a4')) : new Color('#8892a4');
     };
 
     // Build parent → direct children map
@@ -328,10 +359,14 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       n.isFile ? fileColor(n.path) : (folderColorMap.get(n.path) ?? new Color('#8892a4'));
     const colorOf = this.colorOf;
 
-    // Visible files (filtered by size)
-    const { fileSizeMin, fileSizeMax } = this.display;
+    // Visible files (filtered by size and hidden extensions)
+    const { fileSizeMin, fileSizeMax, hiddenExtensions } = this.display;
+    const hiddenExtSet = new Set(hiddenExtensions);
     const visibleFiles = this.display.showFiles
-      ? allFiles.filter(n => (n.fileSize ?? 0) >= fileSizeMin && (n.fileSize ?? 0) <= fileSizeMax)
+      ? allFiles.filter(n => {
+          const size = n.fileSize ?? 0;
+          return size >= fileSizeMin && size <= fileSizeMax && !hiddenExtSet.has(fileExt(n.path));
+        })
       : [];
 
     // Mark folders that have at least one visible file anywhere in their subtree

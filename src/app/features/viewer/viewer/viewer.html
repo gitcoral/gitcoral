@@ -1,7 +1,7 @@
 <div class="viewer-shell">
 
   <div class="canvas-area">
-    <app-three-canvas class="canvas" [result]="result()" [resetCamera]="resetCamera" [display]="display" />
+    <app-three-canvas class="canvas" [result]="result()" [resetCamera]="resetCamera" [display]="display" (extColorsChange)="extColors = $event" />
   </div>
 
   <aside class="sidebar">
@@ -9,6 +9,7 @@
       [status]="status()"
       [initialRepo]="initialRepo"
       [maxFileSize]="maxFileSize"
+      [extColors]="extColors"
       (repoSubmit)="onRepoSubmit($event)"
       (paramsChange)="onParamsChange($event)"
       (displayChange)="display = $event"

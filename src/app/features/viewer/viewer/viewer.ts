@@ -17,6 +17,7 @@ export class Viewer implements OnInit {
 
   resetCamera = false;
   display: DisplayOptions = { ...DEFAULT_DISPLAY_OPTIONS };
+  extColors: { ext: string; label: string; color: string; count: number }[] = [];
   status = signal<LoadingState>('idle');
   initialRepo = '';
 

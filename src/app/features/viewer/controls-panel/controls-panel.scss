@@ -153,3 +153,78 @@ mat-slider {
   margin: 0;
   line-height: 1.5;
 }
+
+// Extensions chip filter
+.ext-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ext-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.ext-action-btn {
+  background: none;
+  border: 1px solid $border;
+  border-radius: 3px;
+  color: $text-dim;
+  font-size: 10px;
+  padding: 1px 5px;
+  cursor: pointer;
+  line-height: 1.4;
+
+  &:hover { color: $text; border-color: rgba(120, 140, 170, 0.6); }
+}
+
+.ext-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 2px 0;
+}
+
+.ext-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  color: $text;
+  font-size: 11px;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: opacity 0.15s, background 0.15s;
+  white-space: nowrap;
+  line-height: 1.4;
+
+  &:hover { background: rgba(255, 255, 255, 0.1); }
+
+  &.ext-chip--hidden {
+    opacity: 0.35;
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.07);
+    color: $text-dim;
+  }
+}
+
+.ext-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ext-count {
+  font-size: 10px;
+  color: $text-dim;
+  margin-left: 2px;
+
+  .ext-chip--hidden & { opacity: 0.6; }
+}
