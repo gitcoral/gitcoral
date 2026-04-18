@@ -35,11 +35,14 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 // Constants
 // ---------------------------------------------------------------------------
 
-const DIM = 0.08;
-const BG  = new Color(0x0c0e12);
+const DIM               = 0.08;
+const BG                = new Color(0x0c0e12);
+const DEFAULT_COLOR     = new Color(0x8892a4);
+const EDGE_WIDTH_IN_MIN = 2;
+const EDGE_WIDTH_IN_MAX = 12;
 
 // ---------------------------------------------------------------------------
-// Colour helpers
+// Helpers
 // ---------------------------------------------------------------------------
 
 function hashPath(path: string): number {
@@ -48,16 +51,32 @@ function hashPath(path: string): number {
   return Math.abs(h);
 }
 
+function parentPath(path: string): string {
+  const i = path.lastIndexOf('/');
+  return i >= 0 ? path.substring(0, i) : '';
+}
+
+function toHex(c: Color): string {
+  return '#' + c.clone().convertLinearToSRGB().getHexString();
+}
+
+function makeCbrtNormalizer(values: number[], outMin: number, outMax: number): (v: number) => number {
+  const cbrtValues = values.map(v => Math.cbrt(v));
+  const min   = Math.min(...cbrtValues, 0);
+  const max   = Math.max(...cbrtValues, 1);
+  const range = max - min || 1;
+  return (v: number) => outMin + (outMax - outMin) * (Math.cbrt(v) - min) / range;
+}
 
 export function buildExtColorMap(extCounts: Map<string, number>): Map<string, Color> {
   const GOLDEN = 0.61803398875;
   const sorted = [...extCounts.entries()].sort((a, b) => b[1] - a[1]);
   const map    = new Map<string, Color>();
-  sorted.forEach(([ext], i) => {
+  for (let i = 0; i < sorted.length; i++) {
     const hue       = Math.round((i * GOLDEN % 1) * 360);
     const lightness = i % 2 === 0 ? 65 : 75;
-    map.set(ext, new Color(`hsl(${hue},80%,${lightness}%)`));
-  });
+    map.set(sorted[i][0], new Color(`hsl(${hue},80%,${lightness}%)`));
+  }
   return map;
 }
 
@@ -130,7 +149,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   // Tooltip
   private tipEl!: HTMLDivElement;
   private tipNodePos: Vector3 | null = null;
-  private colorOf: ((n: PositionedNode) => Color) = () => new Color('#8892a4');
+  private colorOf: ((n: PositionedNode) => Color) = () => DEFAULT_COLOR;
 
   // Track last result for which we emitted extColors
   private lastEmittedResult: LayoutResult | null = null;
@@ -292,15 +311,19 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const folders: PositionedNode[] = [];
     for (const n of nodes) (n.isFile ? allFiles : folders).push(n);
 
+    const fileExt = (path: string) => {
+      const filename = path.slice(path.lastIndexOf('/') + 1);
+      const dot = filename.lastIndexOf('.');
+      return dot > 0 && dot < filename.length - 1 ? filename.slice(dot + 1).toLowerCase() : '';
+    };
+
     // Colour map — extension → Color
     const extCounts = new Map<string, number>();
     let noExtCount = 0;
     for (const n of allFiles) {
-      const filename = n.path.slice(n.path.lastIndexOf('/') + 1);
-      const dot = filename.lastIndexOf('.');
-      if (dot < 0 || dot >= filename.length - 1) { noExtCount++; continue; }
-      const ext = filename.slice(dot + 1).toLowerCase();
-      extCounts.set(ext, (extCounts.get(ext) ?? 0) + 1);
+      const ext = fileExt(n.path);
+      if (ext) extCounts.set(ext, (extCounts.get(ext) ?? 0) + 1);
+      else noExtCount++;
     }
     const colorMap = buildExtColorMap(extCounts);
 
@@ -310,35 +333,29 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       const extColorsList = [...colorMap.entries()].map(([ext, color]) => ({
         ext,
         label: ext,
-        color: '#' + color.clone().convertLinearToSRGB().getHexString(),
+        color: toHex(color),
         count: extCounts.get(ext) ?? 0,
       }));
       if (noExtCount > 0) {
         const insertAt = extColorsList.findIndex(e => e.count <= noExtCount);
-        const noneEntry = { ext: '', label: '(none)', color: '#8892a4', count: noExtCount };
+        const noneEntry = { ext: '', label: '(none)', color: toHex(DEFAULT_COLOR), count: noExtCount };
         if (insertAt === -1) extColorsList.push(noneEntry);
         else extColorsList.splice(insertAt, 0, noneEntry);
       }
       this.extColorsChange.emit(extColorsList);
     }
 
-    const fileExt = (path: string) => {
-      const filename = path.slice(path.lastIndexOf('/') + 1);
-      const dot = filename.lastIndexOf('.');
-      return dot >= 0 && dot < filename.length - 1 ? filename.slice(dot + 1).toLowerCase() : '';
-    };
-
     const fileColor = (path: string): Color => {
       const ext = fileExt(path);
-      return ext ? (colorMap.get(ext) ?? new Color('#8892a4')) : new Color('#8892a4');
+      return ext ? (colorMap.get(ext) ?? DEFAULT_COLOR) : DEFAULT_COLOR;
     };
 
     // Build parent → direct children map
     const childrenOf = new Map<string, PositionedNode[]>();
     for (const n of nodes) {
-      const parentPath = n.path.includes('/') ? n.path.substring(0, n.path.lastIndexOf('/')) : '';
-      if (!childrenOf.has(parentPath)) childrenOf.set(parentPath, []);
-      childrenOf.get(parentPath)!.push(n);
+      const p = parentPath(n.path);
+      if (!childrenOf.has(p)) childrenOf.set(p, []);
+      childrenOf.get(p)!.push(n);
     }
 
     // Bottom-up: average children's colors into each folder (deepest folders first)
@@ -347,17 +364,17 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     for (const folder of sortedFolders) {
       const children = childrenOf.get(folder.path) ?? [];
-      if (!children.length) { folderColorMap.set(folder.path, new Color('#8892a4')); continue; }
+      if (!children.length) { folderColorMap.set(folder.path, DEFAULT_COLOR); continue; }
       let r = 0, g = 0, b = 0;
       for (const child of children) {
-        const c = child.isFile ? fileColor(child.path) : (folderColorMap.get(child.path) ?? new Color('#8892a4'));
+        const c = child.isFile ? fileColor(child.path) : (folderColorMap.get(child.path) ?? DEFAULT_COLOR);
         r += c.r; g += c.g; b += c.b;
       }
       folderColorMap.set(folder.path, new Color(r / children.length, g / children.length, b / children.length));
     }
 
     this.colorOf = (n: PositionedNode): Color =>
-      n.isFile ? fileColor(n.path) : (folderColorMap.get(n.path) ?? new Color('#8892a4'));
+      n.isFile ? fileColor(n.path) : (folderColorMap.get(n.path) ?? DEFAULT_COLOR);
     const colorOf = this.colorOf;
 
     // Visible files (filtered by size and hidden extensions)
@@ -375,7 +392,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     for (const file of visibleFiles) {
       let p = file.path;
       while (p.includes('/')) {
-        p = p.substring(0, p.lastIndexOf('/'));
+        p = parentPath(p);
         foldersWithContent.add(p);
       }
     }
@@ -390,21 +407,9 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     // Separate size scales for files and folders so each uses its own cbrt range.
     // Files are normalized against file sizes only — gives full fileDotMin–fileDotMax spread.
     // Folders are normalized against subtreeBytes with their own range.
-    const { fileDotMin, fileDotMax } = this.display;
-    const fileCbrt      = allFiles.map(n => Math.cbrt(n.fileSize ?? 0));
-    const fileCbrtMin   = Math.min(...fileCbrt, 0);
-    const fileCbrtMax   = Math.max(...fileCbrt, 1);
-    const fileCbrtRange = fileCbrtMax - fileCbrtMin || 1;
-    const toFileSize    = (bytes: number) =>
-      fileDotMin + (fileDotMax - fileDotMin) * (Math.cbrt(bytes) - fileCbrtMin) / fileCbrtRange;
-
-    const { folderDotMin, folderDotMax } = this.display;
-    const folderCbrt      = folders.map(n => Math.cbrt(n.subtreeBytes));
-    const folderCbrtMin   = Math.min(...folderCbrt, 0);
-    const folderCbrtMax   = Math.max(...folderCbrt, 1);
-    const folderCbrtRange = folderCbrtMax - folderCbrtMin || 1;
-    const toFolderSize    = (bytes: number) =>
-      folderDotMin + (folderDotMax - folderDotMin) * (Math.cbrt(bytes) - folderCbrtMin) / folderCbrtRange;
+    const { fileDotMin, fileDotMax, folderDotMin, folderDotMax } = this.display;
+    const toFileSize   = makeCbrtNormalizer(allFiles.map(n => n.fileSize ?? 0), fileDotMin, fileDotMax);
+    const toFolderSize = makeCbrtNormalizer(folders.map(n => n.subtreeBytes),   folderDotMin, folderDotMax);
 
     const toSize = (n: PositionedNode) =>
       n.isFile ? toFileSize(n.fileSize ?? 0) : toFolderSize(n.subtreeBytes);
@@ -492,23 +497,20 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     for (const node of folders) {
       if (!node.path) continue;
-      const parentPath = node.path.includes('/')
-        ? node.path.substring(0, node.path.lastIndexOf('/'))
-        : '';
-      const parent = nodeByPath.get(parentPath);
+      const pp     = parentPath(node.path);
+      const parent = nodeByPath.get(pp);
       if (!parent) continue;
 
       const hue        = hashPath(node.path) % 360;
       const c          = new Color(`hsl(${hue},20%,60%)`);
-      const focused    = inFocus(node.path) && inFocus(parentPath);
+      const focused    = inFocus(node.path) && inFocus(pp);
       const depthBucket = Math.min(
         Math.floor((node.z - zMin) / zRange * DEPTH_BUCKETS), DEPTH_BUCKETS - 1);
       const { connectorOpacityMin, connectorOpacityMax } = this.display;
       const depthAlpha  = focused
         ? connectorOpacityMax - (connectorOpacityMax - connectorOpacityMin) * (depthBucket / (DEPTH_BUCKETS - 1))
         : DIM;
-      const W_IN_MIN = 2, W_IN_MAX = 12;
-      const t = Math.max(0, Math.min(1, (node.connectionWidth - W_IN_MIN) / (W_IN_MAX - W_IN_MIN)));
+      const t = Math.max(0, Math.min(1, (node.connectionWidth - EDGE_WIDTH_IN_MIN) / (EDGE_WIDTH_IN_MAX - EDGE_WIDTH_IN_MIN)));
       const scaledW = this.display.connectorWidthMin + (this.display.connectorWidthMax - this.display.connectorWidthMin) * t;
       const wBucket = Math.round(scaledW * 2) / 2;
       const key     = `${focused ? 1 : 0}-${depthBucket}-${wBucket}`;
@@ -685,7 +687,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   }
 
   private showTooltip(node: PositionedNode, worldPos: Vector3): void {
-    const hex = '#' + this.colorOf(node).clone().convertLinearToSRGB().getHexString();
+    const hex = toHex(this.colorOf(node));
     this.tipEl.innerHTML = node.isFile
       ? `<div>${node.path}</div><div>${(node.fileSize ?? 0).toLocaleString()} bytes</div>`
       : `<div>${node.path || '(root)'}</div>`;
