@@ -159,7 +159,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     this.tipEl = document.createElement('div');
     this.tipEl.className = 'orb-tip';
-    this.tipEl.style.cssText = 'position:fixed;pointer-events:none;display:none;';
+    this.tipEl.style.cssText = 'position:fixed;pointer-events:none;display:none;z-index:5;';
     document.body.appendChild(this.tipEl);
 
     const c = this.canvasRef.nativeElement;
@@ -222,6 +222,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.controls.addEventListener('start', () => {
       this.isOrbiting = true;
       this.canvasRef.nativeElement.style.cursor = '';
+      if (!this.selectedNode) this.hideTooltip();
     });
     this.controls.addEventListener('end', () => { this.isOrbiting = false; });
   }
