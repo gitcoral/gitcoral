@@ -159,8 +159,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     this.tipEl = document.createElement('div');
     this.tipEl.className = 'orb-tip';
-    this.tipEl.style.cssText = 'position:fixed;pointer-events:none;display:none;z-index:5;';
-    document.body.appendChild(this.tipEl);
+    this.tipEl.style.cssText = 'position:absolute;pointer-events:none;display:none;z-index:5;';
+    this.canvasRef.nativeElement.parentElement!.appendChild(this.tipEl);
 
     const c = this.canvasRef.nativeElement;
     c.addEventListener('mousemove',  this.onMouseMove);
@@ -238,8 +238,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
         const canvas = this.canvasRef.nativeElement;
         const rect = canvas.getBoundingClientRect();
         proj.copy(this.tipNodePos).project(this.camera);
-        const sx = (proj.x + 1) / 2 * rect.width  + rect.left;
-        const sy = (-proj.y + 1) / 2 * rect.height + rect.top;
+        const sx = (proj.x + 1) / 2 * rect.width;
+        const sy = (-proj.y + 1) / 2 * rect.height;
         this.tipEl.style.left = `${sx + 12}px`;
         this.tipEl.style.top  = `${sy + 12}px`;
       }
