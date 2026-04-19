@@ -171,7 +171,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   private mouseDownX = 0;
   private mouseDownY = 0;
   private isOrbiting = false;
-  private justOrbitedEnd = false;
+  private orbitEndTime = 0;
 
   // Bound event handlers (needed for removeEventListener)
   private readonly onMouseMove  = this._onMouseMove.bind(this);
@@ -257,7 +257,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       this.canvasRef.nativeElement.style.cursor = '';
       if (!this.selectedNode) this.hideTooltip();
     });
-    this.controls.addEventListener('end', () => { this.isOrbiting = false; this.justOrbitedEnd = true; });
+    this.controls.addEventListener('end', () => { this.isOrbiting = false; this.orbitEndTime = performance.now(); });
   }
 
   private startLoop(): void {
@@ -724,7 +724,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
   private _onMouseMove(e: MouseEvent): void {
     if (this.isOrbiting) return;
-    if (this.justOrbitedEnd) { this.justOrbitedEnd = false; return; }
+    if (performance.now() - this.orbitEndTime < 150) return;
 
     if (this.selectedNode) {
       const hit = this.raycast(e);
