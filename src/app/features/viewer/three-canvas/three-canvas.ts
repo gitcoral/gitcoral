@@ -171,13 +171,12 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   private mouseDownX = 0;
   private mouseDownY = 0;
   private isOrbiting = false;
-  private orbitEndTime = 0;
 
   // Bound event handlers (needed for removeEventListener)
-  private readonly onMouseMove  = this._onMouseMove.bind(this);
-  private readonly onMouseLeave = this._onMouseLeave.bind(this);
-  private readonly onMouseDown  = this._onMouseDown.bind(this);
-  private readonly onClick      = this._onClick.bind(this);
+  private readonly onPointerMove  = this._onPointerMove.bind(this);
+  private readonly onPointerLeave = this._onPointerLeave.bind(this);
+  private readonly onMouseDown    = this._onMouseDown.bind(this);
+  private readonly onClick        = this._onClick.bind(this);
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -196,10 +195,10 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.canvasRef.nativeElement.parentElement!.appendChild(this.tipEl);
 
     const c = this.canvasRef.nativeElement;
-    c.addEventListener('mousemove',  this.onMouseMove);
-    c.addEventListener('mouseleave', this.onMouseLeave);
-    c.addEventListener('mousedown',  this.onMouseDown);
-    c.addEventListener('click',      this.onClick);
+    c.addEventListener('pointermove',  this.onPointerMove);
+    c.addEventListener('pointerleave', this.onPointerLeave);
+    c.addEventListener('mousedown',    this.onMouseDown);
+    c.addEventListener('click',        this.onClick);
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -223,10 +222,10 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.controls.dispose();
     this.renderer.dispose();
     const c = this.canvasRef.nativeElement;
-    c.removeEventListener('mousemove',  this.onMouseMove);
-    c.removeEventListener('mouseleave', this.onMouseLeave);
-    c.removeEventListener('mousedown',  this.onMouseDown);
-    c.removeEventListener('click',      this.onClick);
+    c.removeEventListener('pointermove',  this.onPointerMove);
+    c.removeEventListener('pointerleave', this.onPointerLeave);
+    c.removeEventListener('mousedown',    this.onMouseDown);
+    c.removeEventListener('click',        this.onClick);
   }
 
   // ---------------------------------------------------------------------------
@@ -257,7 +256,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       this.canvasRef.nativeElement.style.cursor = '';
       if (!this.selectedNode) this.hideTooltip();
     });
-    this.controls.addEventListener('end', () => { this.isOrbiting = false; this.orbitEndTime = performance.now(); });
+    this.controls.addEventListener('end', () => { this.isOrbiting = false; });
   }
 
   private startLoop(): void {
@@ -722,9 +721,9 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.tipNodePos = null;
   }
 
-  private _onMouseMove(e: MouseEvent): void {
+  private _onPointerMove(e: PointerEvent): void {
+    if (e.pointerType !== 'mouse') return;
     if (this.isOrbiting) return;
-    if (performance.now() - this.orbitEndTime < 150) return;
 
     if (this.selectedNode) {
       const hit = this.raycast(e);
@@ -742,7 +741,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     }
   }
 
-  private _onMouseLeave(): void {
+  private _onPointerLeave(e: PointerEvent): void {
+    if (e.pointerType !== 'mouse') return;
     if (this.selectedNode) return; // keep pinned tooltip visible
     this.hideTooltip();
     this.canvasRef.nativeElement.style.cursor = '';
