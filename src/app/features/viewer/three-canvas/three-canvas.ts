@@ -178,7 +178,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     this.tipEl = document.createElement('div');
     this.tipEl.className = 'orb-tip';
-    this.tipEl.style.cssText = 'position:absolute;pointer-events:none;display:none;z-index:5;';
+    this.tipEl.style.cssText = 'position:absolute;pointer-events:none;display:none;z-index:5;font-size:13px;-webkit-text-size-adjust:none;';
     this.canvasRef.nativeElement.parentElement!.appendChild(this.tipEl);
 
     const c = this.canvasRef.nativeElement;
