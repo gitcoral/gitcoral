@@ -254,10 +254,10 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.controls.screenSpacePanning = false;
     this.controls.addEventListener('start', () => {
       this.isOrbiting = true;
-      this.didOrbit   = true;
       this.canvasRef.nativeElement.style.cursor = '';
       if (!this.selectedNode) this.hideTooltip();
     });
+    this.controls.addEventListener('change', () => { if (this.isOrbiting) this.didOrbit = true; });
     this.controls.addEventListener('end', () => { this.isOrbiting = false; });
   }
 
