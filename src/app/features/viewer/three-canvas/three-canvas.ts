@@ -387,16 +387,22 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
         })
       : [];
 
-    // Mark folders that have at least one visible file anywhere in their subtree
+    // Mark folders that have at least one file passing size/extension filters.
+    // Intentionally ignores showFiles so folders stay visible when files are toggled off,
+    // but correctly hides empty folders when size/extension filters narrow the file set.
+    const filteredForFolders = allFiles.filter(n => {
+      const size = n.fileSize ?? 0;
+      return size >= fileSizeMin && size <= fileSizeMax && !hiddenExtSet.has(fileExt(n.path));
+    });
     const foldersWithContent = new Set<string>();
-    for (const file of visibleFiles) {
+    for (const file of filteredForFolders) {
       let p = file.path;
       while (p.includes('/')) {
         p = parentPath(p);
         foldersWithContent.add(p);
       }
     }
-    if (visibleFiles.length) foldersWithContent.add(''); // root
+    if (filteredForFolders.length) foldersWithContent.add(''); // root
 
     const visibleFolders = this.display.showFolders
       ? folders.filter(n => foldersWithContent.has(n.path))
@@ -421,10 +427,11 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     if (focused.length) this.addPoints(focused, 1.0, colorOf, toSize);
     if (dimmed.length)  this.addPoints(dimmed,  DIM, colorOf, toSize);
 
-    // Edges
+    // Edges — use foldersWithContent so connectors stay visible when showFolders is off
     if (this.display.showConnectors) {
       const nodeByPath = new Map(nodes.map(n => [n.path, n]));
-      this.addEdges(visibleFolders, nodeByPath, focusSet);
+      const edgeFolders = folders.filter(n => foldersWithContent.has(n.path));
+      this.addEdges(edgeFolders, nodeByPath, focusSet);
     }
   }
 
