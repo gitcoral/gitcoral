@@ -112,7 +112,20 @@ const FRAG = /* glsl */`
     if (r > 0.25) discard;
     // Folders: hollow ring (discard inner 55% of radius)
     if (vIsFolder > 0.5 && r < 0.075) discard;
-    gl_FragColor = vec4(vColor, uOpacity);
+
+    // Sphere impostor: reconstruct hemisphere normal from point coord
+    float z      = sqrt(0.25 - r);
+    vec3  normal = normalize(vec3(uv, z));
+
+    vec3  light   = normalize(vec3(0.6, 0.8, 0.8));
+    float diffuse = max(dot(normal, light), 0.0);
+    float ambient = 0.25;
+
+    vec3  halfVec = normalize(light + vec3(0.0, 0.0, 1.0));
+    float spec    = pow(max(dot(normal, halfVec), 0.0), 32.0) * 0.4;
+
+    vec3 lit = vColor * (ambient + diffuse) + vec3(spec);
+    gl_FragColor = vec4(lit, uOpacity);
     #include <colorspace_fragment>
   }
 `;
