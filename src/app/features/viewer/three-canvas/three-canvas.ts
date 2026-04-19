@@ -171,6 +171,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   private mouseDownX = 0;
   private mouseDownY = 0;
   private isOrbiting = false;
+  private didOrbit   = false;
 
   // Bound event handlers (needed for removeEventListener)
   private readonly onPointerMove  = this._onPointerMove.bind(this);
@@ -253,6 +254,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.controls.screenSpacePanning = false;
     this.controls.addEventListener('start', () => {
       this.isOrbiting = true;
+      this.didOrbit   = true;
       this.canvasRef.nativeElement.style.cursor = '';
       if (!this.selectedNode) this.hideTooltip();
     });
@@ -749,6 +751,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   }
 
   private _onClick(e: MouseEvent): void {
+    if (this.didOrbit) { this.didOrbit = false; return; }
     const dx = e.clientX - this.mouseDownX;
     const dy = e.clientY - this.mouseDownY;
     if (dx * dx + dy * dy > 16) return; // drag, not click
