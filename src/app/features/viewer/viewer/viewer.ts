@@ -1,4 +1,4 @@
-import { Component, OnInit, effect, signal, untracked } from '@angular/core';
+import { Component, OnInit, ViewChild, effect, signal, untracked } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { GithubService } from '../../../core/services/github';
@@ -14,6 +14,8 @@ import { ThreeCanvas } from '../three-canvas/three-canvas';
   styleUrl: './viewer.scss',
 })
 export class Viewer implements OnInit {
+
+  @ViewChild(ThreeCanvas) private threeCanvas!: ThreeCanvas;
 
   resetCamera = false;
   display: DisplayOptions = { ...DEFAULT_DISPLAY_OPTIONS };
@@ -75,6 +77,13 @@ export class Viewer implements OnInit {
       this.layout.error.set(e instanceof Error ? e.message : String(e));
       this.status.set('idle');
     }
+  }
+
+  onSnapshot(): void {
+    const filename = this.repoName
+      ? `${this.repoName.replace('/', '-')}-snapshot.png`
+      : 'gitcoral-snapshot.png';
+    this.threeCanvas.takeSnapshot(filename);
   }
 
   onParamsChange(params: LayoutParams): void {

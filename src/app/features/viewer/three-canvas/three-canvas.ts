@@ -129,6 +129,15 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     }
   }
 
+  takeSnapshot(filename = 'gitcoral-snapshot.png'): void {
+    this.renderer.render(this.scene, this.camera);
+    const url = this.renderer.domElement.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+  }
+
   ngOnDestroy(): void {
     cancelAnimationFrame(this.rafId);
     this.resizeObserver.disconnect();
@@ -151,7 +160,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const w = canvas.clientWidth  || 800;
     const h = canvas.clientHeight || 600;
 
-    this.renderer = new WebGLRenderer({ canvas, antialias: true });
+    this.renderer = new WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(devicePixelRatio);
     this.renderer.setSize(w, h, false);
 

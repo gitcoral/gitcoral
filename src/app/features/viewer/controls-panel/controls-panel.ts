@@ -35,9 +35,10 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
   @Input() initialRepo = '';
   @Input() maxFileSize = 0;
   @Input() extColors: { ext: string; label: string; color: string; count: number }[] = [];
-  @Output() repoSubmit     = new EventEmitter<RepoSubmitEvent>();
-  @Output() paramsChange   = new EventEmitter<LayoutParams>();
-  @Output() displayChange  = new EventEmitter<DisplayOptions>();
+  @Output() repoSubmit      = new EventEmitter<RepoSubmitEvent>();
+  @Output() paramsChange    = new EventEmitter<LayoutParams>();
+  @Output() displayChange   = new EventEmitter<DisplayOptions>();
+  @Output() snapshotRequest = new EventEmitter<void>();
 
   repoUrl = '';
   params: LayoutParams = { ...DEFAULT_LAYOUT_PARAMS };
@@ -133,6 +134,10 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
 
   onDisplayChange(): void {
     this.displayChange.emit({ ...this.display });
+  }
+
+  onSnapshot(): void {
+    this.snapshotRequest.emit();
   }
 
   onSubmit(): void {
