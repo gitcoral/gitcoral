@@ -137,8 +137,7 @@ export function layoutTree(root: TreeStructure, params: LayoutParams): Positione
   const { layerHeight, zScale, buoyancy, repulsion, decay, sphereD } = params;
 
   const layoutRoot      = toLayoutNode(root);
-  const maxSubtree      = layoutRoot.subtreeBytes ?? 1;
-  const maxSubtreeCbrt  = Math.cbrt(maxSubtree);
+  const maxSubtreeCbrt  = Math.cbrt(layoutRoot.subtreeBytes);
   const maxFileCbrt     = maxFileCbrtInTree(layoutRoot);
 
   function place(n: LayoutNode, hintAngle: number, conn: number): void {
@@ -149,17 +148,14 @@ export function layoutTree(root: TreeStructure, params: LayoutParams): Positione
       .sort((a, b) => b.subtreeBytes - a.subtreeBytes);
 
     const coords = simulate(folders.map(f => f.subtreeBytes), buoyancy, repulsion);
-    const maxSb  = folders.reduce((m, f) => Math.max(m, f.subtreeBytes), 1);
 
     for (let i = 0; i < folders.length; i++) {
       const sf = folders[i];
       const [theta, phi] = coords[i];
       const phiG = (phi + hintAngle) % (2 * Math.PI);
 
-      const scale     = 0.3 + 0.7 * Math.log1p(sf.subtreeBytes) / Math.log1p(maxSb);
-      const childConn = conn * scale;
-      const r = childConn * Math.sin(theta);
-      const h = childConn * Math.cos(theta);
+      const r = conn * Math.sin(theta);
+      const h = conn * Math.cos(theta);
 
       const x = px + r * Math.cos(phiG);
       const y = py + r * Math.sin(phiG);
