@@ -35,7 +35,7 @@ export interface LayoutParams {
   buoyancy: number;
   repulsion: number;
   decay: number;
-  dotD: number;
+  sphereD: number;
 }
 
 export const DEFAULT_LAYOUT_PARAMS: LayoutParams = {
@@ -44,7 +44,7 @@ export const DEFAULT_LAYOUT_PARAMS: LayoutParams = {
   buoyancy: 2.0,
   repulsion: 1.5,
   decay: 0.82,
-  dotD: 0.02,
+  sphereD: 0.02,
 };
 
 export type LoadingState = 'idle' | 'fetching' | 'computing';

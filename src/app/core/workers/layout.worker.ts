@@ -134,7 +134,7 @@ function flattenLayoutTree(root: LayoutNode): PositionedNode[] {
 
 // Takes a TreeStructure, returns a flat PositionedNode[] ready for the renderer.
 export function layoutTree(root: TreeStructure, params: LayoutParams): PositionedNode[] {
-  const { layerHeight, zScale, buoyancy, repulsion, decay, dotD } = params;
+  const { layerHeight, zScale, buoyancy, repulsion, decay, sphereD } = params;
 
   const layoutRoot      = toLayoutNode(root);
   const maxSubtree      = layoutRoot.subtreeBytes ?? 1;
@@ -187,7 +187,7 @@ export function layoutTree(root: TreeStructure, params: LayoutParams): Positione
     if (Nf > 0) {
       const avgFileCbrt = files.reduce((s, f) => s + Math.cbrt(f.fileSize ?? 0), 0) / Nf;
       const sizeScale   = maxFileCbrt > 0 ? avgFileCbrt / maxFileCbrt : 0;
-      const cloudR      = (dotD / 2) * Math.sqrt(Nf) * (1 + sizeScale);
+      const cloudR      = (sphereD / 2) * Math.sqrt(Nf) * (1 + sizeScale);
       for (let i = 0; i < Nf; i++) {
         const f    = files[i];
         const cosT = 1 - (2 * i + 1) / Nf;

@@ -12,7 +12,7 @@ const PARAMS: LayoutParams = {
   buoyancy: 2.0,
   repulsion: 1.5,
   decay: 0.82,
-  dotD: 0.02,
+  sphereD: 0.02,
 };
 
 function makeFile(path: string, fileSize = 100): TreeStructure {
