@@ -44,6 +44,8 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
   params: LayoutParams = { ...DEFAULT_LAYOUT_PARAMS };
   display: DisplayOptions = { ...DEFAULT_DISPLAY_OPTIONS };
   collapsed = false;
+  displayExpanded = false;
+  layoutExpanded = false;
 
   // Log-scale slider positions (0–1000); converted to bytes on change.
   fileSizePosMin = 0;
@@ -61,12 +63,13 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
     min: number;
     max: number;
     step: number;
+    tooltip: string;
   }> = [
-    { key: 'zScale',   label: 'Z scale',          min: 0.1,   max: 2.0,  step: 0.05  },
-    { key: 'buoyancy', label: 'Buoyancy',          min: 0.1,   max: 6.0,  step: 0.1   },
-    { key: 'repulsion', label: 'Repulsion',         min: 0.1,   max: 6.0,  step: 0.1   },
-    { key: 'spread',   label: 'Spread',             min: 0.3,   max: 0.99, step: 0.01  },
-    { key: 'sphereD',  label: 'File sphere size',   min: 0.005, max: 0.1,  step: 0.005 },
+    { key: 'zScale',    label: 'Z scale',          min: 0.1,   max: 2.0,  step: 0.05,  tooltip: 'Vertical stretch of the hierarchy — higher values push layers further apart'      },
+    { key: 'buoyancy',  label: 'Buoyancy',          min: 0.1,   max: 6.0,  step: 0.1,   tooltip: 'Downward pull on folder nodes within their layer — increase to spread them out'   },
+    { key: 'repulsion', label: 'Repulsion',          min: 0.1,   max: 6.0,  step: 0.1,   tooltip: 'How strongly folders push each other apart — increase if nodes overlap'           },
+    { key: 'spread',    label: 'Spread',             min: 0.3,   max: 0.99, step: 0.01,  tooltip: 'How tightly child folders cluster within their parent sphere'                     },
+    { key: 'sphereD',   label: 'File sphere size',   min: 0.005, max: 0.1,  step: 0.005, tooltip: 'Radius of the point cloud of files orbiting each folder'                         },
   ];
 
   private params$ = new Subject<LayoutParams>();
@@ -132,12 +135,45 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
     this.params$.next({ ...this.params });
   }
 
+  onDisplayReset(): void {
+    this.display = {
+      ...DEFAULT_DISPLAY_OPTIONS,
+      fileSizeMin: this.display.fileSizeMin,
+      fileSizeMax: this.display.fileSizeMax,
+      hiddenExtensions: [],
+    };
+    this.fileSizePosMin = 0;
+    this.fileSizePosMax = 1000;
+    this.displayChange.emit({ ...this.display });
+  }
+
   onDisplayChange(): void {
     this.displayChange.emit({ ...this.display });
   }
 
   onSnapshot(): void {
     this.snapshotRequest.emit();
+  }
+
+  onShareX(): void {
+    const repo = this.repoUrl.trim();
+    const text = encodeURIComponent(`Exploring ${repo} as a 3D coral reef`);
+    const url = encodeURIComponent(window.location.href);
+    window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, '_blank', 'noopener');
+  }
+
+  onShareReddit(): void {
+    const repo = this.repoUrl.trim();
+    const title = encodeURIComponent(`Visualizing ${repo} as a 3D coral reef — GitCoral`);
+    const url = encodeURIComponent(window.location.href);
+    window.open(`https://reddit.com/submit?url=${url}&title=${title}`, '_blank', 'noopener');
+  }
+
+  onShareHN(): void {
+    const repo = this.repoUrl.trim();
+    const title = encodeURIComponent(`GitCoral: ${repo} visualized as a 3D coral reef`);
+    const url = encodeURIComponent(window.location.href);
+    window.open(`https://news.ycombinator.com/submitlink?u=${url}&t=${title}`, '_blank', 'noopener');
   }
 
   onSubmit(): void {

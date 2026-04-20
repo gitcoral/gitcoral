@@ -15,7 +15,7 @@
       <!-- Repo input -->
       <section class="section">
         <label class="section-label">Repository</label>
-        <mat-form-field appearance="outline" class="repo-field">
+        <mat-form-field appearance="outline" class="repo-field" subscriptSizing="dynamic">
           <input
             matInput
             placeholder="github.com/owner/repo"
@@ -39,70 +39,34 @@
             }
           </span>
         </button>
-        <button
-          mat-stroked-button
-          class="snapshot-btn"
-          (click)="onSnapshot()"
-          matTooltip="Download PNG snapshot"
-        >
-          <mat-icon>photo_camera</mat-icon>
-          Snapshot
-        </button>
+        @if (repoUrl.trim()) {
+          <div class="output-row">
+            <button class="output-btn" (click)="onSnapshot()" [disabled]="status !== 'idle'" matTooltip="Download PNG snapshot">
+              <mat-icon>photo_camera</mat-icon>
+            </button>
+            <button class="output-btn" (click)="onShareX()" [disabled]="status !== 'idle'" matTooltip="Share on X">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+            </button>
+            <button class="output-btn output-btn--reddit" (click)="onShareReddit()" [disabled]="status !== 'idle'" matTooltip="Share on Reddit">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+                <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/>
+              </svg>
+            </button>
+            <button class="output-btn output-btn--hn" (click)="onShareHN()" [disabled]="status !== 'idle'" matTooltip="Share on Hacker News">HN</button>
+          </div>
+        }
       </section>
 
-      <!-- Display toggles -->
+      <!-- Visibility — always visible -->
       <section class="section">
-        <label class="section-label">Display</label>
         @for (opt of displayOptions; track opt.key) {
           <mat-checkbox
             [(ngModel)]="display[opt.key]"
             (ngModelChange)="onDisplayChange()"
           >{{ opt.label }}</mat-checkbox>
         }
-
-        <div class="slider-row">
-          <div class="slider-meta">
-            <span class="slider-label">Connector opacity</span>
-            <span class="slider-value">{{ display.connectorOpacityMin }} – {{ display.connectorOpacityMax }}</span>
-          </div>
-          <mat-slider min="0.1" max="0.9" step="0.05">
-            <input matSliderStartThumb [(ngModel)]="display.connectorOpacityMin" (ngModelChange)="onDisplayChange()" />
-            <input matSliderEndThumb [(ngModel)]="display.connectorOpacityMax" (ngModelChange)="onDisplayChange()" />
-          </mat-slider>
-        </div>
-
-        <div class="slider-row">
-          <div class="slider-meta">
-            <span class="slider-label">Connector width</span>
-            <span class="slider-value">{{ display.connectorWidthMin }} – {{ display.connectorWidthMax }}</span>
-          </div>
-          <mat-slider min="1" max="20" step="0.5">
-            <input matSliderStartThumb [(ngModel)]="display.connectorWidthMin" (ngModelChange)="onDisplayChange()" />
-            <input matSliderEndThumb [(ngModel)]="display.connectorWidthMax" (ngModelChange)="onDisplayChange()" />
-          </mat-slider>
-        </div>
-
-        <div class="slider-row">
-          <div class="slider-meta">
-            <span class="slider-label">File dot size</span>
-            <span class="slider-value">{{ display.fileDotMin }} – {{ display.fileDotMax }}</span>
-          </div>
-          <mat-slider min="1" max="30" step="0.5">
-            <input matSliderStartThumb [(ngModel)]="display.fileDotMin" (ngModelChange)="onDisplayChange()" />
-            <input matSliderEndThumb [(ngModel)]="display.fileDotMax" (ngModelChange)="onDisplayChange()" />
-          </mat-slider>
-        </div>
-
-        <div class="slider-row">
-          <div class="slider-meta">
-            <span class="slider-label">Folder dot size</span>
-            <span class="slider-value">{{ display.folderDotMin }} – {{ display.folderDotMax }}</span>
-          </div>
-          <mat-slider min="1" max="30" step="0.5">
-            <input matSliderStartThumb [(ngModel)]="display.folderDotMin" (ngModelChange)="onDisplayChange()" />
-            <input matSliderEndThumb [(ngModel)]="display.folderDotMax" (ngModelChange)="onDisplayChange()" />
-          </mat-slider>
-        </div>
 
         @if (maxFileSize > 0) {
           <div class="slider-row">
@@ -140,26 +104,95 @@
             </div>
           </div>
         }
-
       </section>
 
-      <!-- Layout sliders -->
+      <!-- Display fine-tuning — collapsible -->
       <section class="section">
-        <div class="section-label">
-          Layout
-          <button mat-icon-button class="reset-btn" (click)="onReset()" matTooltip="Reset to defaults">↺</button>
+        <div class="section-label section-label--toggle" (click)="displayExpanded = !displayExpanded">
+          <span>Display</span>
+          <div class="section-label-end">
+            @if (displayExpanded) {
+              <button mat-icon-button class="reset-btn" (click)="onDisplayReset(); $event.stopPropagation()" matTooltip="Reset to defaults">
+                <mat-icon>restart_alt</mat-icon>
+              </button>
+            }
+            <mat-icon class="chevron" [class.chevron--open]="displayExpanded">chevron_right</mat-icon>
+          </div>
         </div>
 
-        @for (s of sliders; track s.key) {
+        @if (displayExpanded) {
           <div class="slider-row">
             <div class="slider-meta">
-              <span class="slider-label">{{ s.label }}</span>
-              <span class="slider-value">{{ params[s.key] }}</span>
+              <span class="slider-label">Connector opacity</span>
+              <span class="slider-value">{{ display.connectorOpacityMin }} – {{ display.connectorOpacityMax }}</span>
             </div>
-            <mat-slider [min]="s.min" [max]="s.max" [step]="s.step">
-              <input matSliderThumb [(ngModel)]="params[s.key]" (ngModelChange)="onSliderChange()" />
+            <mat-slider min="0.1" max="0.9" step="0.05">
+              <input matSliderStartThumb [(ngModel)]="display.connectorOpacityMin" (ngModelChange)="onDisplayChange()" />
+              <input matSliderEndThumb [(ngModel)]="display.connectorOpacityMax" (ngModelChange)="onDisplayChange()" />
             </mat-slider>
           </div>
+
+          <div class="slider-row">
+            <div class="slider-meta">
+              <span class="slider-label">Connector width</span>
+              <span class="slider-value">{{ display.connectorWidthMin }} – {{ display.connectorWidthMax }}</span>
+            </div>
+            <mat-slider min="1" max="20" step="0.5">
+              <input matSliderStartThumb [(ngModel)]="display.connectorWidthMin" (ngModelChange)="onDisplayChange()" />
+              <input matSliderEndThumb [(ngModel)]="display.connectorWidthMax" (ngModelChange)="onDisplayChange()" />
+            </mat-slider>
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-meta">
+              <span class="slider-label">File dot size</span>
+              <span class="slider-value">{{ display.fileDotMin }} – {{ display.fileDotMax }}</span>
+            </div>
+            <mat-slider min="1" max="30" step="0.5">
+              <input matSliderStartThumb [(ngModel)]="display.fileDotMin" (ngModelChange)="onDisplayChange()" />
+              <input matSliderEndThumb [(ngModel)]="display.fileDotMax" (ngModelChange)="onDisplayChange()" />
+            </mat-slider>
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-meta">
+              <span class="slider-label">Folder dot size</span>
+              <span class="slider-value">{{ display.folderDotMin }} – {{ display.folderDotMax }}</span>
+            </div>
+            <mat-slider min="1" max="30" step="0.5">
+              <input matSliderStartThumb [(ngModel)]="display.folderDotMin" (ngModelChange)="onDisplayChange()" />
+              <input matSliderEndThumb [(ngModel)]="display.folderDotMax" (ngModelChange)="onDisplayChange()" />
+            </mat-slider>
+          </div>
+        }
+      </section>
+
+      <!-- Layout — collapsible -->
+      <section class="section">
+        <div class="section-label section-label--toggle" (click)="layoutExpanded = !layoutExpanded">
+          <span>Layout</span>
+          <div class="section-label-end">
+            @if (layoutExpanded) {
+              <button mat-icon-button class="reset-btn" (click)="onReset(); $event.stopPropagation()" matTooltip="Reset to defaults">
+                <mat-icon>restart_alt</mat-icon>
+              </button>
+            }
+            <mat-icon class="chevron" [class.chevron--open]="layoutExpanded">chevron_right</mat-icon>
+          </div>
+        </div>
+
+        @if (layoutExpanded) {
+          @for (s of sliders; track s.key) {
+            <div class="slider-row">
+              <div class="slider-meta" [matTooltip]="s.tooltip" matTooltipPosition="left">
+                <span class="slider-label">{{ s.label }}</span>
+                <span class="slider-value">{{ params[s.key] }}</span>
+              </div>
+              <mat-slider [min]="s.min" [max]="s.max" [step]="s.step">
+                <input matSliderThumb [(ngModel)]="params[s.key]" (ngModelChange)="onSliderChange()" />
+              </mat-slider>
+            </div>
+          }
         }
       </section>
 

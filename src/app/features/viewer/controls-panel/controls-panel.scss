@@ -54,7 +54,7 @@ $text-dim: #8899aa;
   padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 0;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
@@ -64,6 +64,11 @@ $text-dim: #8899aa;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding: 14px 0;
+
+  &:first-child { padding-top: 4px; }
+
+  & + & { border-top: 1px solid $border; }
 }
 
 .section-label {
@@ -75,11 +80,75 @@ $text-dim: #8899aa;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: $text-dim;
+
+  &--toggle {
+    cursor: pointer;
+    user-select: none;
+    &:hover { color: $text; }
+  }
 }
 
-.render-btn,
-.snapshot-btn {
+.section-label-end {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.chevron {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+  transition: transform 0.2s ease;
+
+  &--open { transform: rotate(90deg); }
+}
+
+.render-btn {
   width: 100%;
+}
+
+.output-row {
+  display: flex;
+  gap: 4px;
+}
+
+.output-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  color: $text-dim;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    line-height: 16px;
+  }
+
+  &:hover {
+    color: $text;
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.25);
+  }
+
+  &--hn {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
 }
 
 .btn-content {
@@ -139,11 +208,22 @@ mat-slider {
   margin: 0 12px;
 }
 
+
 .reset-btn {
-  width: 24px;
-  height: 24px;
-  font-size: 14px;
+  width: 24px !important;
+  height: 24px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   color: $text-dim;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    line-height: 16px;
+  }
 
   &:hover { color: $text; }
 }
@@ -185,8 +265,6 @@ mat-slider {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  max-height: 120px;
-  overflow-y: auto;
   padding: 2px 0;
 }
 

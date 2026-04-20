@@ -38,6 +38,31 @@ app-root {
   height: 100%;
 }
 
+.render-btn,
+.render-btn .mdc-button__ripple,
+.render-btn .mat-mdc-button-ripple {
+  border-radius: 6px !important;
+}
+
+.render-btn {
+  --mat-button-filled-container-color: #d4603e;
+  --mat-button-filled-label-text-color: #fff;
+}
+
+// Input font size — Material defaults to 16px to prevent iOS zoom, too large for this panel
+.repo-field {
+  --mat-form-field-container-text-size: 13px;
+}
+
+// Checkbox — smaller label and tighter touch target
+app-controls-panel .mdc-form-field {
+  font-size: 13px;
+}
+
+app-controls-panel .mdc-checkbox {
+  --mdc-checkbox-state-layer-size: 24px;
+}
+
 .orb-tip {
   position: fixed;
   background: rgb(107, 114, 135);
