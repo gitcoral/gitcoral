@@ -1,5 +1,5 @@
 import { Component, OnInit, ViewChild, effect, signal, untracked } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 
 import { GithubService } from '../../../core/services/github';
 import { LayoutService } from '../../../core/services/layout';
@@ -22,6 +22,7 @@ export class Viewer implements OnInit {
   extColors: { ext: string; label: string; color: string; count: number }[] = [];
   status = signal<LoadingState>('idle');
   initialRepo = '';
+  cameraParam: string | null = null;
 
   get result() { return this.layout.result; }
   get error()  { return this.layout.error; }
@@ -40,6 +41,7 @@ export class Viewer implements OnInit {
     private github: GithubService,
     private layout: LayoutService,
     private router: Router,
+    private route: ActivatedRoute,
   ) {
     // When layout finishes (result or error changes), go back to idle
     effect(() => {
@@ -50,10 +52,11 @@ export class Viewer implements OnInit {
   }
 
   ngOnInit(): void {
-    const repo = new URLSearchParams(window.location.search).get('repo');
-    if (repo) {
-      this.initialRepo = repo;
-      this.onRepoSubmit({ url: repo });
+    const { owner, repo } = this.route.snapshot.params;
+    if (owner && repo) {
+      this.initialRepo = `${owner}/${repo}`;
+      this.cameraParam = this.route.snapshot.queryParams['cam'] ?? null;
+      this.loadRepo(owner, repo);
     }
   }
 
@@ -62,21 +65,31 @@ export class Viewer implements OnInit {
     const parsed = this.github.parseRepoUrl(event.url);
     if (!parsed) { this.layout.error.set('Invalid GitHub URL'); return; }
 
-    this.router.navigate([], {
-      queryParams: { repo: `${parsed.owner}/${parsed.repo}` },
-      replaceUrl: false,
-    });
+    this.cameraParam = null;
+    this.router.navigate([parsed.owner, parsed.repo], { replaceUrl: false });
+    await this.loadRepo(parsed.owner, parsed.repo);
+  }
 
+  private async loadRepo(owner: string, repo: string): Promise<void> {
     this.status.set('fetching');
     try {
-      this.rawRoot = await this.github.fetchTree(parsed.owner, parsed.repo);
-      this.repoName = `${parsed.owner}/${parsed.repo}`;
+      this.rawRoot = await this.github.fetchTree(owner, repo);
+      this.repoName = `${owner}/${repo}`;
       this.resetCamera = true;
       this.scheduleLayout();
     } catch (e) {
       this.layout.error.set(e instanceof Error ? e.message : String(e));
       this.status.set('idle');
     }
+  }
+
+  onCameraChange(cam: string): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { cam },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   onSnapshot(): void {

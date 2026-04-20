@@ -57,7 +57,9 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   @Input() result: LayoutResult | null = null;
   @Input() resetCamera = false;
   @Input() display: DisplayOptions = { ...DEFAULT_DISPLAY_OPTIONS };
+  @Input() cameraParam: string | null = null;
   @Output() extColorsChange = new EventEmitter<{ ext: string; label: string; color: string; count: number }[]>();
+  @Output() cameraChange = new EventEmitter<string>();
   @ViewChild('canvas', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
 
   private renderer!: WebGLRenderer;
@@ -121,9 +123,12 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       this.selectedNode = null;
       this.hideTooltip();
       this.rebuildScene();
-      // Always fit on new result — resetCamera=false only suppresses it on param tweaks
       const isFirstLoad = !changes['result'].previousValue;
-      if (this.resetCamera || isFirstLoad) requestAnimationFrame(() => this.fitCamera());
+      if (isFirstLoad && this.cameraParam) {
+        requestAnimationFrame(() => this.restoreCamera(this.cameraParam!));
+      } else if (this.resetCamera || isFirstLoad) {
+        requestAnimationFrame(() => this.fitCamera());
+      }
     } else if (changes['display']) {
       this.rebuildScene();
     }
@@ -180,7 +185,13 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       if (!this.selectedNode) this.hideTooltip();
     });
     this.controls.addEventListener('change', () => { if (this.isOrbiting) this.didOrbit = true; });
-    this.controls.addEventListener('end', () => { this.isOrbiting = false; });
+    this.controls.addEventListener('end', () => {
+      this.isOrbiting = false;
+      const p = this.camera.position;
+      const t = this.controls.target;
+      const r = (v: number) => Math.round(v * 100) / 100;
+      this.cameraChange.emit(`${r(p.x)},${r(p.y)},${r(p.z)},${r(t.x)},${r(t.y)},${r(t.z)}`);
+    });
   }
 
   private startLoop(): void {
@@ -478,6 +489,16 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   // ---------------------------------------------------------------------------
   // Camera
   // ---------------------------------------------------------------------------
+
+  private restoreCamera(param: string): void {
+    const parts = param.split(',').map(Number);
+    if (parts.length !== 6 || parts.some(isNaN)) { this.fitCamera(); return; }
+    const [px, py, pz, tx, ty, tz] = parts;
+    this.controls.target.set(tx, ty, tz);
+    this.camera.position.set(px, py, pz);
+    this.camera.updateProjectionMatrix();
+    this.controls.update();
+  }
 
   private fitCamera(): void {
     const nodes = this.result?.nodes;

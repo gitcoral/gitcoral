@@ -1,7 +1,7 @@
 <div class="viewer-shell">
 
   <div class="canvas-area">
-    <app-three-canvas class="canvas" [result]="result()" [resetCamera]="resetCamera" [display]="display" (extColorsChange)="extColors = $event" />
+    <app-three-canvas class="canvas" [result]="result()" [resetCamera]="resetCamera" [display]="display" [cameraParam]="cameraParam" (extColorsChange)="extColors = $event" (cameraChange)="onCameraChange($event)" />
   </div>
 
   <aside class="sidebar">

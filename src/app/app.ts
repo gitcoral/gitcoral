@@ -1,10 +1,10 @@
 import { Component } from '@angular/core';
-import { Viewer } from './features/viewer/viewer/viewer';
+import { RouterOutlet } from '@angular/router';
 
 @Component({
   selector: 'app-root',
-  imports: [Viewer],
-  template: '<app-viewer />',
+  imports: [RouterOutlet],
+  template: '<router-outlet />',
   styles: [':host { display: block; width: 100%; height: 100%; }'],
 })
 export class App {}
