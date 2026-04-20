@@ -30,6 +30,9 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
+import { VERT, FRAG } from './node-shaders';
+import { DEFAULT_COLOR, buildExtColorMap, toHex } from './color-palette';
+import { buildFocusSet, fileExt, hashPath, makeCbrtNormalizer, parentPath } from './scene-utils';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -37,98 +40,8 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 
 const DIM               = 0.08;
 const BG                = new Color(0x0c0e12);
-const DEFAULT_COLOR     = new Color(0x8892a4);
 const EDGE_WIDTH_IN_MIN = 2;
 const EDGE_WIDTH_IN_MAX = 12;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function hashPath(path: string): number {
-  let h = 0;
-  for (let i = 0; i < path.length; i++) h = (Math.imul(31, h) + path.charCodeAt(i)) | 0;
-  return Math.abs(h);
-}
-
-function parentPath(path: string): string {
-  const i = path.lastIndexOf('/');
-  return i >= 0 ? path.substring(0, i) : '';
-}
-
-function toHex(c: Color): string {
-  return '#' + c.clone().convertLinearToSRGB().getHexString();
-}
-
-function makeCbrtNormalizer(values: number[], outMin: number, outMax: number): (v: number) => number {
-  const cbrtValues = values.map(v => Math.cbrt(v));
-  const min   = Math.min(...cbrtValues, 0);
-  const max   = Math.max(...cbrtValues, 1);
-  const range = max - min || 1;
-  return (v: number) => outMin + (outMax - outMin) * (Math.cbrt(v) - min) / range;
-}
-
-export function buildExtColorMap(extCounts: Map<string, number>): Map<string, Color> {
-  const GOLDEN = 0.61803398875;
-  const sorted = [...extCounts.entries()].sort((a, b) => b[1] - a[1]);
-  const map    = new Map<string, Color>();
-  for (let i = 0; i < sorted.length; i++) {
-    const hue       = Math.round((i * GOLDEN % 1) * 360);
-    const lightness = i % 2 === 0 ? 65 : 75;
-    map.set(sorted[i][0], new Color(`hsl(${hue},80%,${lightness}%)`));
-  }
-  return map;
-}
-
-// ---------------------------------------------------------------------------
-// Shaders for circular points with per-vertex size and colour
-// ---------------------------------------------------------------------------
-
-const VERT = /* glsl */`
-  attribute float aSize;
-  attribute vec3  aColor;
-  attribute float aIsFolder;
-  varying   vec3  vColor;
-  varying   float vIsFolder;
-  uniform   float uPixelRatio;
-
-  void main() {
-    vColor    = aColor;
-    vIsFolder = aIsFolder;
-    vec4 mv      = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = aSize * uPixelRatio;
-    gl_Position  = projectionMatrix * mv;
-  }
-`;
-
-const FRAG = /* glsl */`
-  uniform float uOpacity;
-  varying vec3  vColor;
-  varying float vIsFolder;
-
-  void main() {
-    vec2  uv = gl_PointCoord - vec2(0.5);
-    float r  = dot(uv, uv);
-    if (r > 0.25) discard;
-    // Folders: hollow ring (discard inner 55% of radius)
-    if (vIsFolder > 0.5 && r < 0.075) discard;
-
-    // Sphere impostor: reconstruct hemisphere normal from point coord
-    float z      = sqrt(0.25 - r);
-    vec3  normal = normalize(vec3(uv, z));
-
-    vec3  light   = normalize(vec3(0.6, 0.8, 0.8));
-    float diffuse = max(dot(normal, light), 0.0);
-    float ambient = 0.25;
-
-    vec3  halfVec = normalize(light + vec3(0.0, 0.0, 1.0));
-    float spec    = pow(max(dot(normal, halfVec), 0.0), 32.0) * 0.4;
-
-    vec3 lit = vColor * (ambient + diffuse) + vec3(spec);
-    gl_FragColor = vec4(lit, uOpacity);
-    #include <colorspace_fragment>
-  }
-`;
 
 // ---------------------------------------------------------------------------
 // Component
@@ -305,7 +218,39 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   // ---------------------------------------------------------------------------
 
   private rebuildScene(): void {
-    // Remove and dispose previous scene objects
+    this.disposeScene();
+    if (!this.result) return;
+
+    const nodes    = this.result.nodes;
+    const allFiles: PositionedNode[] = [];
+    const folders:  PositionedNode[] = [];
+    for (const n of nodes) (n.isFile ? allFiles : folders).push(n);
+
+    const focusSet = this.selectedNode ? buildFocusSet(nodes, this.selectedNode.path) : null;
+    const colorOf  = this.buildColorMaps(allFiles, folders, nodes);
+    const { visibleFiles, visibleFolders, foldersWithContent } = this.computeVisibility(allFiles, folders);
+
+    const { fileDotMin, fileDotMax, folderDotMin, folderDotMax } = this.display;
+    const toFileSize   = makeCbrtNormalizer(allFiles.map(n => n.fileSize ?? 0), fileDotMin, fileDotMax);
+    const toFolderSize = makeCbrtNormalizer(folders.map(n => n.subtreeBytes),   folderDotMin, folderDotMax);
+    const toSize = (n: PositionedNode) => n.isFile ? toFileSize(n.fileSize ?? 0) : toFolderSize(n.subtreeBytes);
+
+    const inFocus = (path: string) => !focusSet || focusSet.has(path);
+    const visible = [...visibleFolders, ...visibleFiles];
+    const focused = focusSet ? visible.filter(n =>  inFocus(n.path)) : visible;
+    const dimmed  = focusSet ? visible.filter(n => !inFocus(n.path)) : [];
+
+    if (focused.length) this.addPoints(focused, 1.0, colorOf, toSize);
+    if (dimmed.length)  this.addPoints(dimmed,  DIM, colorOf, toSize);
+
+    if (this.display.showConnectors) {
+      const nodeByPath  = new Map(nodes.map(n => [n.path, n]));
+      const edgeFolders = folders.filter(n => foldersWithContent.has(n.path));
+      this.addEdges(edgeFolders, nodeByPath, focusSet);
+    }
+  }
+
+  private disposeScene(): void {
     for (const obj of this.sceneObjects) {
       this.scene.remove(obj);
       if (obj instanceof Points || obj instanceof LineSegments2) {
@@ -315,24 +260,15 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       }
     }
     this.sceneObjects = [];
+  }
 
-    if (!this.result) return;
-    const nodes    = this.result.nodes;
-    const focusSet = this.selectedNode ? this.buildFocusSet(nodes, this.selectedNode.path) : null;
-    const inFocus  = (path: string) => !focusSet || focusSet.has(path);
-
-    // Single pass: partition nodes into files and folders
-    const allFiles: PositionedNode[]   = [];
-    const folders: PositionedNode[] = [];
-    for (const n of nodes) (n.isFile ? allFiles : folders).push(n);
-
-    const fileExt = (path: string) => {
-      const filename = path.slice(path.lastIndexOf('/') + 1);
-      const dot = filename.lastIndexOf('.');
-      return dot > 0 && dot < filename.length - 1 ? filename.slice(dot + 1).toLowerCase() : '';
-    };
-
-    // Colour map — extension → Color
+  // Builds extension and folder color maps, emits extColorsChange when the result changes,
+  // and updates this.colorOf. Returns colorOf for use in the current render pass.
+  private buildColorMaps(
+    allFiles: PositionedNode[],
+    folders:  PositionedNode[],
+    nodes:    PositionedNode[],
+  ): (n: PositionedNode) => Color {
     const extCounts = new Map<string, number>();
     let noExtCount = 0;
     for (const n of allFiles) {
@@ -340,44 +276,34 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       if (ext) extCounts.set(ext, (extCounts.get(ext) ?? 0) + 1);
       else noExtCount++;
     }
-    const colorMap = buildExtColorMap(extCounts);
-
-    // Emit extension → CSS color list whenever the result (file set) changes
-    if (this.result !== this.lastEmittedResult) {
-      this.lastEmittedResult = this.result;
-      const extColorsList = [...colorMap.entries()].map(([ext, color]) => ({
-        ext,
-        label: ext,
-        color: toHex(color),
-        count: extCounts.get(ext) ?? 0,
-      }));
-      if (noExtCount > 0) {
-        const insertAt = extColorsList.findIndex(e => e.count <= noExtCount);
-        const noneEntry = { ext: '', label: '(none)', color: toHex(DEFAULT_COLOR), count: noExtCount };
-        if (insertAt === -1) extColorsList.push(noneEntry);
-        else extColorsList.splice(insertAt, 0, noneEntry);
-      }
-      this.extColorsChange.emit(extColorsList);
-    }
-
+    const colorMap  = buildExtColorMap(extCounts);
     const fileColor = (path: string): Color => {
       const ext = fileExt(path);
       return ext ? (colorMap.get(ext) ?? DEFAULT_COLOR) : DEFAULT_COLOR;
     };
 
-    // Build parent → direct children map
+    if (this.result !== this.lastEmittedResult) {
+      this.lastEmittedResult = this.result;
+      const list = [...colorMap.entries()].map(([ext, color]) => ({
+        ext, label: ext, color: toHex(color), count: extCounts.get(ext) ?? 0,
+      }));
+      if (noExtCount > 0) {
+        const noneEntry = { ext: '', label: '(none)', color: toHex(DEFAULT_COLOR), count: noExtCount };
+        const insertAt  = list.findIndex(e => e.count <= noExtCount);
+        if (insertAt === -1) list.push(noneEntry); else list.splice(insertAt, 0, noneEntry);
+      }
+      this.extColorsChange.emit(list);
+    }
+
+    // Bottom-up: average children's colors into each folder (deepest folders first)
     const childrenOf = new Map<string, PositionedNode[]>();
     for (const n of nodes) {
       const p = parentPath(n.path);
       if (!childrenOf.has(p)) childrenOf.set(p, []);
       childrenOf.get(p)!.push(n);
     }
-
-    // Bottom-up: average children's colors into each folder (deepest folders first)
     const folderColorMap = new Map<string, Color>();
-    const sortedFolders  = [...folders].sort((a, b) => b.path.split('/').length - a.path.split('/').length);
-
-    for (const folder of sortedFolders) {
+    for (const folder of [...folders].sort((a, b) => b.path.split('/').length - a.path.split('/').length)) {
       const children = childrenOf.get(folder.path) ?? [];
       if (!children.length) { folderColorMap.set(folder.path, DEFAULT_COLOR); continue; }
       let r = 0, g = 0, b = 0;
@@ -390,64 +316,37 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     this.colorOf = (n: PositionedNode): Color =>
       n.isFile ? fileColor(n.path) : (folderColorMap.get(n.path) ?? DEFAULT_COLOR);
-    const colorOf = this.colorOf;
+    return this.colorOf;
+  }
 
-    // Visible files (filtered by size and hidden extensions)
-    const { fileSizeMin, fileSizeMax, hiddenExtensions } = this.display;
+  // Filters files and folders by the current display options. foldersWithContent drives
+  // both folder visibility and connector rendering (independent of showFiles).
+  private computeVisibility(allFiles: PositionedNode[], folders: PositionedNode[]): {
+    visibleFiles:       PositionedNode[];
+    visibleFolders:     PositionedNode[];
+    foldersWithContent: Set<string>;
+  } {
+    const { fileSizeMin, fileSizeMax, hiddenExtensions, showFiles, showFolders } = this.display;
     const hiddenExtSet = new Set(hiddenExtensions);
-    const visibleFiles = this.display.showFiles
-      ? allFiles.filter(n => {
-          const size = n.fileSize ?? 0;
-          return size >= fileSizeMin && size <= fileSizeMax && !hiddenExtSet.has(fileExt(n.path));
-        })
-      : [];
-
-    // Mark folders that have at least one file passing size/extension filters.
-    // Intentionally ignores showFiles so folders stay visible when files are toggled off,
-    // but correctly hides empty folders when size/extension filters narrow the file set.
-    const filteredForFolders = allFiles.filter(n => {
+    const passesFilter = (n: PositionedNode) => {
       const size = n.fileSize ?? 0;
       return size >= fileSizeMin && size <= fileSizeMax && !hiddenExtSet.has(fileExt(n.path));
-    });
+    };
+
+    const visibleFiles = showFiles ? allFiles.filter(passesFilter) : [];
+
+    // Walk ancestors of every filter-passing file to mark which folders have content.
+    // Intentionally ignores showFiles so folders stay visible when files are toggled off.
     const foldersWithContent = new Set<string>();
-    for (const file of filteredForFolders) {
+    const filtered = allFiles.filter(passesFilter);
+    for (const file of filtered) {
       let p = file.path;
-      while (p.includes('/')) {
-        p = parentPath(p);
-        foldersWithContent.add(p);
-      }
+      while (p.includes('/')) { p = parentPath(p); foldersWithContent.add(p); }
     }
-    if (filteredForFolders.length) foldersWithContent.add(''); // root
+    if (filtered.length) foldersWithContent.add(''); // root
 
-    const visibleFolders = this.display.showFolders
-      ? folders.filter(n => foldersWithContent.has(n.path))
-      : [];
-
-    const visible: PositionedNode[] = [...visibleFolders, ...visibleFiles];
-
-    // Separate size scales for files and folders so each uses its own cbrt range.
-    // Files are normalized against file sizes only — gives full fileDotMin–fileDotMax spread.
-    // Folders are normalized against subtreeBytes with their own range.
-    const { fileDotMin, fileDotMax, folderDotMin, folderDotMax } = this.display;
-    const toFileSize   = makeCbrtNormalizer(allFiles.map(n => n.fileSize ?? 0), fileDotMin, fileDotMax);
-    const toFolderSize = makeCbrtNormalizer(folders.map(n => n.subtreeBytes),   folderDotMin, folderDotMax);
-
-    const toSize = (n: PositionedNode) =>
-      n.isFile ? toFileSize(n.fileSize ?? 0) : toFolderSize(n.subtreeBytes);
-
-    // Split focused / dimmed
-    const focused = focusSet ? visible.filter(n =>  inFocus(n.path)) : visible;
-    const dimmed  = focusSet ? visible.filter(n => !inFocus(n.path)) : [];
-
-    if (focused.length) this.addPoints(focused, 1.0, colorOf, toSize);
-    if (dimmed.length)  this.addPoints(dimmed,  DIM, colorOf, toSize);
-
-    // Edges — use foldersWithContent so connectors stay visible when showFolders is off
-    if (this.display.showConnectors) {
-      const nodeByPath = new Map(nodes.map(n => [n.path, n]));
-      const edgeFolders = folders.filter(n => foldersWithContent.has(n.path));
-      this.addEdges(edgeFolders, nodeByPath, focusSet);
-    }
+    const visibleFolders = showFolders ? folders.filter(n => foldersWithContent.has(n.path)) : [];
+    return { visibleFiles, visibleFolders, foldersWithContent };
   }
 
   private addPoints(
@@ -631,23 +530,6 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   }
 
   // ---------------------------------------------------------------------------
-  // Focus system
-  // ---------------------------------------------------------------------------
-
-  private buildFocusSet(nodes: PositionedNode[], focusPath: string): Set<string> {
-    const set = new Set<string>();
-    set.add(focusPath);
-    const parts = focusPath.split('/');
-    for (let i = 1; i < parts.length; i++) set.add(parts.slice(0, i).join('/'));
-    set.add('');
-    const prefix = focusPath ? focusPath + '/' : '';
-    for (const n of nodes) {
-      if (prefix === '' || n.path.startsWith(prefix)) set.add(n.path);
-    }
-    return set;
-  }
-
-  // ---------------------------------------------------------------------------
   // Raycasting (hover + click)
   // ---------------------------------------------------------------------------
 
@@ -710,9 +592,14 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
   private showTooltip(node: PositionedNode, worldPos: Vector3): void {
     const hex = toHex(this.colorOf(node));
-    this.tipEl.innerHTML = node.isFile
-      ? `<div>${node.path}</div><div>${(node.fileSize ?? 0).toLocaleString()} bytes</div>`
-      : `<div>${node.path || '(root)'}</div>`;
+    const line1 = document.createElement('div');
+    line1.textContent = node.path || '(root)';
+    this.tipEl.replaceChildren(line1);
+    if (node.isFile) {
+      const line2 = document.createElement('div');
+      line2.textContent = `${(node.fileSize ?? 0).toLocaleString()} bytes`;
+      this.tipEl.appendChild(line2);
+    }
     this.tipEl.style.background = hex;
     this.tipEl.style.display = '';
     this.tipNodePos = worldPos;
