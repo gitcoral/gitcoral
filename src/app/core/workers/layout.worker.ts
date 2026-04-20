@@ -134,7 +134,7 @@ function flattenLayoutTree(root: LayoutNode): PositionedNode[] {
 
 // Takes a TreeStructure, returns a flat PositionedNode[] ready for the renderer.
 export function layoutTree(root: TreeStructure, params: LayoutParams): PositionedNode[] {
-  const { layerHeight, zScale, buoyancy, repulsion, decay, sphereD } = params;
+  const { layerHeight, zScale, buoyancy, repulsion, spread, sphereD } = params;
 
   const layoutRoot      = toLayoutNode(root);
   const maxSubtreeCbrt  = Math.cbrt(layoutRoot.subtreeBytes);
@@ -171,9 +171,9 @@ export function layoutTree(root: TreeStructure, params: LayoutParams): Positione
       const bucket    = Math.min(N_BUCKETS - 1, Math.floor(t * N_BUCKETS));
       sf.connectionWidth = 2 + (12 - 2) * bucket / (N_BUCKETS - 1);
 
-      // h * decay: vertical displacement of this node becomes the sphere radius for its
+      // h * spread: vertical displacement of this node becomes the sphere radius for its
       // children — tighter sphere the deeper we go, floored to avoid vanishing connectors.
-      const nextSphereRadius = Math.max(h * decay, layerHeight * 0.15);
+      const nextSphereRadius = Math.max(h * spread, layerHeight * 0.15);
       place(sf, phiG, nextSphereRadius);
     }
 

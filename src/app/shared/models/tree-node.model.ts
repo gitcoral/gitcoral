@@ -34,16 +34,16 @@ export interface LayoutParams {
   zScale: number;
   buoyancy: number;
   repulsion: number;
-  decay: number;
+  spread: number;
   sphereD: number;
 }
 
 export const DEFAULT_LAYOUT_PARAMS: LayoutParams = {
   layerHeight: 2.0,
-  zScale: 0.5,
-  buoyancy: 2.0,
+  zScale: 0.6,
+  buoyancy: 3.0,
   repulsion: 1.5,
-  decay: 0.82,
+  spread: 0.8,
   sphereD: 0.02,
 };
 
