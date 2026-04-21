@@ -15,14 +15,13 @@
       <!-- Repo input -->
       <section class="section">
         <label class="section-label">Repository</label>
-        <mat-form-field appearance="outline" class="repo-field" subscriptSizing="dynamic">
-          <input
-            matInput
-            placeholder="github.com/owner/repo"
-            [(ngModel)]="repoUrl"
-            (keydown.enter)="onSubmit()"
-          />
-        </mat-form-field>
+        <input
+          class="repo-input"
+          type="text"
+          placeholder="github.com/owner/repo"
+          [(ngModel)]="repoUrl"
+          (keydown.enter)="onSubmit()"
+        />
         <button
           mat-flat-button
           class="render-btn"
@@ -61,6 +60,23 @@
 
       <!-- Visibility — always visible -->
       <section class="section">
+        @if (maxDepth > 0) {
+          <div class="query-row">
+            <input
+              class="query-input"
+              type="text"
+              placeholder="Filter by path…"
+              [(ngModel)]="display.pathQuery"
+              (ngModelChange)="onQueryChange()"
+            />
+            @if (display.pathQuery) {
+              <button class="query-clear" (click)="clearQuery()">
+                <mat-icon>close</mat-icon>
+              </button>
+            }
+          </div>
+        }
+
         @for (opt of displayOptions; track opt.key) {
           <mat-checkbox
             [(ngModel)]="display[opt.key]"

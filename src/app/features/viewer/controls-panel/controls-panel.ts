@@ -1,7 +1,5 @@
 import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, SimpleChanges, OnChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSliderModule } from '@angular/material/slider';
@@ -18,8 +16,6 @@ export interface RepoSubmitEvent {
   selector: 'app-controls-panel',
   imports: [
     FormsModule,
-    MatFormFieldModule,
-    MatInputModule,
     MatButtonModule,
     MatCheckboxModule,
     MatSliderModule,
@@ -77,12 +73,16 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
   ];
 
   private params$ = new Subject<LayoutParams>();
+  private query$  = new Subject<void>();
   private destroy$ = new Subject<void>();
 
   ngOnInit(): void {
     this.params$
       .pipe(debounceTime(500), takeUntil(this.destroy$))
       .subscribe(p => this.paramsChange.emit(p));
+    this.query$
+      .pipe(debounceTime(300), takeUntil(this.destroy$))
+      .subscribe(() => this.displayChange.emit({ ...this.display }));
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -102,8 +102,9 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
       this.displayChange.emit({ ...this.display });
     }
     if (changes['extColors'] && !changes['extColors'].firstChange) {
-      // New repo loaded — reset hidden extensions and collapsed state
+      // New repo loaded — reset hidden extensions, path query, and collapsed state
       this.display.hiddenExtensions = [];
+      this.display.pathQuery = '';
       this.extExpanded = false;
       this.displayChange.emit({ ...this.display });
     }
@@ -160,6 +161,7 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
       fileSizeMax: this.display.fileSizeMax,
       depthMin: 0,
       depthMax: this.maxDepth || Number.MAX_SAFE_INTEGER,
+      pathQuery: '',
       hiddenExtensions: [],
     };
     this.fileSizePosMin = 0;
@@ -168,6 +170,15 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
   }
 
   onDisplayChange(): void {
+    this.displayChange.emit({ ...this.display });
+  }
+
+  onQueryChange(): void {
+    this.query$.next();
+  }
+
+  clearQuery(): void {
+    this.display.pathQuery = '';
     this.displayChange.emit({ ...this.display });
   }
 
