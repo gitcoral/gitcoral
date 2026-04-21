@@ -63,6 +63,8 @@ export interface DisplayOptions {
   folderDotMax: number;
   fileSizeMin: number;
   fileSizeMax: number;
+  depthMin: number;
+  depthMax: number;
   hiddenExtensions: string[];
 }
 
@@ -80,6 +82,8 @@ export const DEFAULT_DISPLAY_OPTIONS: DisplayOptions = {
   folderDotMax: 20.0,
   fileSizeMin: 0,
   fileSizeMax: Number.MAX_SAFE_INTEGER,
+  depthMin: 0,
+  depthMax: Number.MAX_SAFE_INTEGER,
   hiddenExtensions: [],
 };
 

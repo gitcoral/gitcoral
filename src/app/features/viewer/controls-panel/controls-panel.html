@@ -81,6 +81,19 @@
           </div>
         }
 
+        @if (maxDepth > 0) {
+          <div class="slider-row">
+            <div class="slider-meta">
+              <span class="slider-label">Depth</span>
+              <span class="slider-value">{{ display.depthMin }} – {{ display.depthMax }}</span>
+            </div>
+            <mat-slider [min]="0" [max]="maxDepth" step="1">
+              <input matSliderStartThumb [(ngModel)]="display.depthMin" (ngModelChange)="onDisplayChange()" />
+              <input matSliderEndThumb [(ngModel)]="display.depthMax" (ngModelChange)="onDisplayChange()" />
+            </mat-slider>
+          </div>
+        }
+
         @if (extColors.length > 0) {
           <div class="ext-row">
             <div class="slider-meta">

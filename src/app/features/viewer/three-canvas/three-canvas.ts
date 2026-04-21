@@ -248,7 +248,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     const focusSet = this.selectedNode ? buildFocusSet(nodes, this.selectedNode.path) : null;
     const colorOf  = this.buildColorMaps(allFiles, folders, nodes);
-    const { visibleFiles, visibleFolders, foldersWithContent } = this.computeVisibility(allFiles, folders);
+    const { visibleFiles, visibleFolders, foldersWithContent, inDepthRange } = this.computeVisibility(allFiles, folders);
 
     const { fileDotMin, fileDotMax, folderDotMin, folderDotMax } = this.display;
     const toFileSize   = makeCbrtNormalizer(allFiles.map(n => n.fileSize ?? 0), fileDotMin, fileDotMax);
@@ -265,7 +265,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     if (this.display.showConnectors) {
       const nodeByPath  = new Map(nodes.map(n => [n.path, n]));
-      const edgeFolders = folders.filter(n => foldersWithContent.has(n.path));
+      const edgeFolders = folders.filter(n => foldersWithContent.has(n.path) && inDepthRange(n.path));
       this.addEdges(edgeFolders, nodeByPath, focusSet);
     }
   }
@@ -345,15 +345,14 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     visibleFiles:       PositionedNode[];
     visibleFolders:     PositionedNode[];
     foldersWithContent: Set<string>;
+    inDepthRange:       (path: string) => boolean;
   } {
-    const { fileSizeMin, fileSizeMax, hiddenExtensions, showFiles, showFolders } = this.display;
+    const { fileSizeMin, fileSizeMax, hiddenExtensions, showFiles, showFolders, depthMin, depthMax } = this.display;
     const hiddenExtSet = new Set(hiddenExtensions);
     const passesFilter = (n: PositionedNode) => {
       const size = n.fileSize ?? 0;
       return size >= fileSizeMin && size <= fileSizeMax && !hiddenExtSet.has(fileExt(n.path));
     };
-
-    const visibleFiles = showFiles ? allFiles.filter(passesFilter) : [];
 
     // Walk ancestors of every filter-passing file to mark which folders have content.
     // Intentionally ignores showFiles so folders stay visible when files are toggled off.
@@ -365,8 +364,18 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     }
     if (filtered.length) foldersWithContent.add(''); // root
 
-    const visibleFolders = showFolders ? folders.filter(n => foldersWithContent.has(n.path)) : [];
-    return { visibleFiles, visibleFolders, foldersWithContent };
+    const nodeDepth = (path: string) => path === '' ? 0 : path.split('/').length;
+    const inDepthRange = (path: string) => { const d = nodeDepth(path); return d >= depthMin && d <= depthMax; };
+
+    // Folders that have content AND are within the depth range (independent of showFolders,
+    // so files can be culled by their parent's depth visibility even when showFolders is off).
+    const depthVisibleFolderPaths = new Set(
+      folders.filter(n => foldersWithContent.has(n.path) && inDepthRange(n.path)).map(n => n.path)
+    );
+
+    const visibleFolders = showFolders ? folders.filter(n => depthVisibleFolderPaths.has(n.path)) : [];
+    const visibleFiles   = showFiles   ? allFiles.filter(n => passesFilter(n) && depthVisibleFolderPaths.has(parentPath(n.path))) : [];
+    return { visibleFiles, visibleFolders, foldersWithContent, inDepthRange };
   }
 
   private addPoints(

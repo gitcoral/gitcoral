@@ -34,6 +34,7 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
   @Input() status: LoadingState = 'idle';
   @Input() initialRepo = '';
   @Input() maxFileSize = 0;
+  @Input() maxDepth = 0;
   @Input() extColors: { ext: string; label: string; color: string; count: number }[] = [];
   @Output() repoSubmit      = new EventEmitter<RepoSubmitEvent>();
   @Output() paramsChange    = new EventEmitter<LayoutParams>();
@@ -95,6 +96,11 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
       this.display.fileSizeMax = this.maxFileSize;
       this.displayChange.emit({ ...this.display });
     }
+    if (changes['maxDepth'] && this.maxDepth > 0) {
+      this.display.depthMin = 0;
+      this.display.depthMax = this.maxDepth;
+      this.displayChange.emit({ ...this.display });
+    }
     if (changes['extColors'] && !changes['extColors'].firstChange) {
       // New repo loaded — reset hidden extensions and collapsed state
       this.display.hiddenExtensions = [];
@@ -152,6 +158,8 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
       ...DEFAULT_DISPLAY_OPTIONS,
       fileSizeMin: this.display.fileSizeMin,
       fileSizeMax: this.display.fileSizeMax,
+      depthMin: 0,
+      depthMax: this.maxDepth || Number.MAX_SAFE_INTEGER,
       hiddenExtensions: [],
     };
     this.fileSizePosMin = 0;
