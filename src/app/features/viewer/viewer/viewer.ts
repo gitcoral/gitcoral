@@ -1,4 +1,5 @@
-import { Component, OnInit, ViewChild, effect, signal, untracked } from '@angular/core';
+import { Component, ViewChild, effect, signal, untracked } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { GithubService } from '../../../core/services/github';
@@ -13,7 +14,7 @@ import { ThreeCanvas } from '../three-canvas/three-canvas';
   templateUrl: './viewer.html',
   styleUrl: './viewer.scss',
 })
-export class Viewer implements OnInit {
+export class Viewer {
 
   @ViewChild(ThreeCanvas) private threeCanvas!: ThreeCanvas;
 
@@ -49,15 +50,16 @@ export class Viewer implements OnInit {
       this.layout.error();
       if (untracked(this.status) !== 'idle') this.status.set('idle');
     });
-  }
 
-  ngOnInit(): void {
-    const { owner, repo } = this.route.snapshot.params;
-    if (owner && repo) {
-      this.initialRepo = `${owner}/${repo}`;
-      this.cameraParam = this.route.snapshot.queryParams['cam'] ?? null;
-      this.loadRepo(owner, repo);
-    }
+    // React to route param changes — covers initial load and browser back/forward
+    this.route.params.pipe(takeUntilDestroyed()).subscribe(params => {
+      const { owner, repo } = params;
+      if (owner && repo) {
+        this.initialRepo = `${owner}/${repo}`;
+        this.cameraParam = this.route.snapshot.queryParams['cam'] ?? null;
+        this.loadRepo(owner, repo);
+      }
+    });
   }
 
   async onRepoSubmit(event: RepoSubmitEvent): Promise<void> {
