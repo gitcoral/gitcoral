@@ -10,7 +10,7 @@ export function toHex(c: Color): string {
 // sorted by frequency so the most common extensions get the most distinct hues.
 export function buildExtColorMap(extCounts: Map<string, number>): Map<string, Color> {
   const GOLDEN = 0.61803398875;
-  const sorted = [...extCounts.entries()].sort((a, b) => b[1] - a[1]);
+  const sorted = [...extCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   const map    = new Map<string, Color>();
   for (let i = 0; i < sorted.length; i++) {
     const hue       = Math.round((i * GOLDEN % 1) * 360);

@@ -91,7 +91,7 @@
               </span>
             </div>
             <div class="ext-chips">
-              @for (e of extColors; track e.ext) {
+              @for (e of visibleExtColors; track e.ext) {
                 <button
                   class="ext-chip"
                   [class.ext-chip--hidden]="isExtHidden(e.ext)"
@@ -102,6 +102,15 @@
                 </button>
               }
             </div>
+            @if (extColors.length > EXT_LIMIT) {
+              <button class="ext-expand-btn" (click)="toggleExtExpanded()">
+                @if (extExpanded) {
+                  Collapse
+                } @else {
+                  +{{ extColors.length - EXT_LIMIT }} more
+                }
+              </button>
+            }
           </div>
         }
       </section>

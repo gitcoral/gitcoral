@@ -46,6 +46,9 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
   collapsed = false;
   displayExpanded = false;
   layoutExpanded = false;
+  extExpanded = false;
+
+  readonly EXT_LIMIT = 10;
 
   // Log-scale slider positions (0–1000); converted to bytes on change.
   fileSizePosMin = 0;
@@ -93,10 +96,19 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
       this.displayChange.emit({ ...this.display });
     }
     if (changes['extColors'] && !changes['extColors'].firstChange) {
-      // New repo loaded — reset hidden extensions
+      // New repo loaded — reset hidden extensions and collapsed state
       this.display.hiddenExtensions = [];
+      this.extExpanded = false;
       this.displayChange.emit({ ...this.display });
     }
+  }
+
+  get visibleExtColors() {
+    return this.extExpanded ? this.extColors : this.extColors.slice(0, this.EXT_LIMIT);
+  }
+
+  toggleExtExpanded(): void {
+    this.extExpanded = !this.extExpanded;
   }
 
   isExtHidden(ext: string): boolean {
