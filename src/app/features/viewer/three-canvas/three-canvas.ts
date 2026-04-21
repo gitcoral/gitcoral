@@ -39,6 +39,7 @@ import { buildFocusSet, fileExt, hashPath, makeCbrtNormalizer, parentPath } from
 // ---------------------------------------------------------------------------
 
 const DIM               = 0.08;
+const PATH_DIM          = 0.08;
 const BG                = new Color(0x0c0e12);
 const EDGE_WIDTH_IN_MIN = 2;
 const EDGE_WIDTH_IN_MAX = 12;
@@ -78,6 +79,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   private tipEl!: HTMLDivElement;
   private tipNodePos: Vector3 | null = null;
   private colorOf: ((n: PositionedNode) => Color) = () => DEFAULT_COLOR;
+  private pathDimmedPaths: Set<string> = new Set();
 
   // Track last result for which we emitted extColors
   private lastEmittedResult: LayoutResult | null = null;
@@ -248,25 +250,35 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     const focusSet = this.selectedNode ? buildFocusSet(nodes, this.selectedNode.path) : null;
     const colorOf  = this.buildColorMaps(allFiles, folders, nodes);
-    const { visibleFiles, visibleFolders, foldersWithContent, inDepthRange } = this.computeVisibility(allFiles, folders);
+    const { visibleFiles, visibleFolders, pathDimmedFiles, pathDimmedFolders, foldersWithContent, inDepthRange } = this.computeVisibility(allFiles, folders);
 
     const { fileDotMin, fileDotMax, folderDotMin, folderDotMax } = this.display;
     const toFileSize   = makeCbrtNormalizer(allFiles.map(n => n.fileSize ?? 0), fileDotMin, fileDotMax);
     const toFolderSize = makeCbrtNormalizer(folders.map(n => n.subtreeBytes),   folderDotMin, folderDotMax);
     const toSize = (n: PositionedNode) => n.isFile ? toFileSize(n.fileSize ?? 0) : toFolderSize(n.subtreeBytes);
 
+    const allVisible    = [...visibleFolders,    ...visibleFiles];
+    const allPathDimmed = [...pathDimmedFolders, ...pathDimmedFiles];
+    this.pathDimmedPaths = new Set(allPathDimmed.map(n => n.path));
     const inFocus = (path: string) => !focusSet || focusSet.has(path);
-    const visible = [...visibleFolders, ...visibleFiles];
-    const focused = focusSet ? visible.filter(n =>  inFocus(n.path)) : visible;
-    const dimmed  = focusSet ? visible.filter(n => !inFocus(n.path)) : [];
 
-    if (focused.length) this.addPoints(focused, 1.0, colorOf, toSize);
-    if (dimmed.length)  this.addPoints(dimmed,  DIM, colorOf, toSize);
+    if (focusSet) {
+      // Node selected: focus overrides path query — all nodes participate in focus/dim split
+      const allNodes = [...allVisible, ...allPathDimmed];
+      const focused  = allNodes.filter(n =>  inFocus(n.path));
+      const dimmed   = allNodes.filter(n => !inFocus(n.path));
+      if (focused.length) this.addPoints(focused, 1.0, colorOf, toSize);
+      if (dimmed.length)  this.addPoints(dimmed,  DIM, colorOf, toSize);
+    } else {
+      if (allVisible.length)    this.addPoints(allVisible,    1.0,      colorOf, toSize);
+      if (allPathDimmed.length) this.addPoints(allPathDimmed, PATH_DIM, colorOf, toSize);
+    }
 
     if (this.display.showConnectors) {
-      const nodeByPath  = new Map(nodes.map(n => [n.path, n]));
-      const edgeFolders = folders.filter(n => foldersWithContent.has(n.path) && inDepthRange(n.path));
-      this.addEdges(edgeFolders, nodeByPath, focusSet);
+      const nodeByPath          = new Map(nodes.map(n => [n.path, n]));
+      const edgeFolders         = folders.filter(n => foldersWithContent.has(n.path) && inDepthRange(n.path));
+      const pathDimmedFolderPaths = new Set(pathDimmedFolders.map(n => n.path));
+      this.addEdges(edgeFolders, nodeByPath, focusSet, pathDimmedFolderPaths);
     }
   }
 
@@ -344,10 +356,12 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   private computeVisibility(allFiles: PositionedNode[], folders: PositionedNode[]): {
     visibleFiles:       PositionedNode[];
     visibleFolders:     PositionedNode[];
+    pathDimmedFiles:    PositionedNode[];
+    pathDimmedFolders:  PositionedNode[];
     foldersWithContent: Set<string>;
     inDepthRange:       (path: string) => boolean;
   } {
-    const { fileSizeMin, fileSizeMax, hiddenExtensions, showFiles, showFolders, depthMin, depthMax } = this.display;
+    const { fileSizeMin, fileSizeMax, hiddenExtensions, showFiles, showFolders, depthMin, depthMax, pathQuery } = this.display;
     const hiddenExtSet = new Set(hiddenExtensions);
     const passesFilter = (n: PositionedNode) => {
       const size = n.fileSize ?? 0;
@@ -373,9 +387,27 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       folders.filter(n => foldersWithContent.has(n.path) && inDepthRange(n.path)).map(n => n.path)
     );
 
-    const visibleFolders = showFolders ? folders.filter(n => depthVisibleFolderPaths.has(n.path)) : [];
-    const visibleFiles   = showFiles   ? allFiles.filter(n => passesFilter(n) && depthVisibleFolderPaths.has(parentPath(n.path))) : [];
-    return { visibleFiles, visibleFolders, foldersWithContent, inDepthRange };
+    // Path query: walk ancestors of matching files to compute which folders contain a match.
+    const q = pathQuery.trim().toLowerCase();
+    const foldersMatchingQuery = new Set<string>();
+    if (q) {
+      for (const file of filtered.filter(n => depthVisibleFolderPaths.has(parentPath(n.path)) && n.path.toLowerCase().includes(q))) {
+        foldersMatchingQuery.add(file.path);
+        let p = file.path;
+        while (p.includes('/')) { p = parentPath(p); foldersMatchingQuery.add(p); }
+      }
+      if (foldersMatchingQuery.size) foldersMatchingQuery.add('');
+    }
+
+    const matchesQuery     = (n: PositionedNode) => !q || n.path.toLowerCase().includes(q);
+    const folderInQuery    = (n: PositionedNode) => !q || foldersMatchingQuery.has(n.path);
+
+    const visibleFolders    = showFolders ? folders.filter(n => depthVisibleFolderPaths.has(n.path) && folderInQuery(n)) : [];
+    const pathDimmedFolders = showFolders && q ? folders.filter(n => depthVisibleFolderPaths.has(n.path) && !folderInQuery(n)) : [];
+    const visibleFiles      = showFiles ? allFiles.filter(n => passesFilter(n) && depthVisibleFolderPaths.has(parentPath(n.path)) && matchesQuery(n)) : [];
+    const pathDimmedFiles   = showFiles && q ? allFiles.filter(n => passesFilter(n) && depthVisibleFolderPaths.has(parentPath(n.path)) && !matchesQuery(n)) : [];
+
+    return { visibleFiles, visibleFolders, pathDimmedFiles, pathDimmedFolders, foldersWithContent, inDepthRange };
   }
 
   private addPoints(
@@ -432,8 +464,10 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     folders: PositionedNode[],
     nodeByPath: Map<string, PositionedNode>,
     focusSet: Set<string> | null,
+    pathDimmedPaths?: Set<string>,
   ): void {
-    const inFocus = (path: string) => !focusSet || focusSet.has(path);
+    const inFocus    = (path: string) => !focusSet || focusSet.has(path);
+    const isPathDim  = (path: string) => !focusSet && !!pathDimmedPaths?.has(path);
     const canvas  = this.canvasRef.nativeElement;
 
     const DEPTH_BUCKETS = 8;
@@ -454,16 +488,17 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       const hue        = hashPath(node.path) % 360;
       const c          = new Color(`hsl(${hue},20%,60%)`);
       const focused    = inFocus(node.path) && inFocus(pp);
+      const pathDimmed = isPathDim(node.path) || isPathDim(pp);
       const depthBucket = Math.min(
         Math.floor((node.z - zMin) / zRange * DEPTH_BUCKETS), DEPTH_BUCKETS - 1);
       const { connectorOpacityMin, connectorOpacityMax } = this.display;
       const depthAlpha  = focused
-        ? connectorOpacityMax - (connectorOpacityMax - connectorOpacityMin) * (depthBucket / (DEPTH_BUCKETS - 1))
+        ? (pathDimmed ? PATH_DIM : connectorOpacityMax - (connectorOpacityMax - connectorOpacityMin) * (depthBucket / (DEPTH_BUCKETS - 1)))
         : DIM;
       const t = Math.max(0, Math.min(1, (node.connectionWidth - EDGE_WIDTH_IN_MIN) / (EDGE_WIDTH_IN_MAX - EDGE_WIDTH_IN_MIN)));
       const scaledW = this.display.connectorWidthMin + (this.display.connectorWidthMax - this.display.connectorWidthMin) * t;
       const wBucket = Math.round(scaledW * 2) / 2;
-      const key     = `${focused ? 1 : 0}-${depthBucket}-${wBucket}`;
+      const key     = `${focused ? 1 : 0}-${pathDimmed ? 1 : 0}-${depthBucket}-${wBucket}`;
 
       if (!batches.has(key)) batches.set(key, { pos: [], col: [], depthAlpha, width: scaledW });
       const b = batches.get(key)!;
@@ -660,7 +695,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     }
 
     const hit = this.raycast(e);
-    if (hit) {
+    if (hit && !this.pathDimmedPaths.has(hit.node.path)) {
       this.showTooltip(hit.node, hit.worldPos);
       this.canvasRef.nativeElement.style.cursor = 'pointer';
     } else {
@@ -683,7 +718,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     if (dx * dx + dy * dy > 16) return; // drag, not click
 
     const hit = this.raycast(e);
-    if (hit) {
+    if (hit && !this.pathDimmedPaths.has(hit.node.path)) {
       const isToggle = this.selectedNode?.path === hit.node.path;
       this.selectedNode = isToggle ? null : hit.node;
       if (isToggle) {

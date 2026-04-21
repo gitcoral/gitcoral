@@ -65,6 +65,7 @@ export interface DisplayOptions {
   fileSizeMax: number;
   depthMin: number;
   depthMax: number;
+  pathQuery: string;
   hiddenExtensions: string[];
 }
 
@@ -84,6 +85,7 @@ export const DEFAULT_DISPLAY_OPTIONS: DisplayOptions = {
   fileSizeMax: Number.MAX_SAFE_INTEGER,
   depthMin: 0,
   depthMax: Number.MAX_SAFE_INTEGER,
+  pathQuery: '',
   hiddenExtensions: [],
 };
 
