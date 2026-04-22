@@ -45,7 +45,7 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
   layoutExpanded = false;
   extExpanded = false;
 
-  readonly EXT_LIMIT = 10;
+  readonly EXT_LIMIT = 12;
 
   // Log-scale slider positions (0–1000); converted to bytes on change.
   fileSizePosMin = 0;
@@ -182,29 +182,17 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
     this.displayChange.emit({ ...this.display });
   }
 
+  linkCopied = false;
+
   onSnapshot(): void {
     this.snapshotRequest.emit();
   }
 
-  onShareX(): void {
-    const repo = this.repoUrl.trim();
-    const text = encodeURIComponent(`Exploring ${repo} as a 3D coral reef`);
-    const url = encodeURIComponent(window.location.href);
-    window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, '_blank', 'noopener');
-  }
-
-  onShareReddit(): void {
-    const repo = this.repoUrl.trim();
-    const title = encodeURIComponent(`Visualizing ${repo} as a 3D coral reef — GitCoral`);
-    const url = encodeURIComponent(window.location.href);
-    window.open(`https://reddit.com/submit?url=${url}&title=${title}`, '_blank', 'noopener');
-  }
-
-  onShareHN(): void {
-    const repo = this.repoUrl.trim();
-    const title = encodeURIComponent(`GitCoral: ${repo} visualized as a 3D coral reef`);
-    const url = encodeURIComponent(window.location.href);
-    window.open(`https://news.ycombinator.com/submitlink?u=${url}&t=${title}`, '_blank', 'noopener');
+  onCopyLink(): void {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      this.linkCopied = true;
+      setTimeout(() => this.linkCopied = false, 2000);
+    });
   }
 
   onSubmit(): void {
