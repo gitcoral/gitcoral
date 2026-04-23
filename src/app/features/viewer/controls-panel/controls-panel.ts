@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Subject, debounceTime, takeUntil } from 'rxjs';
 import { DEFAULT_DISPLAY_OPTIONS, DEFAULT_LAYOUT_PARAMS, DisplayOptions, LayoutParams, LoadingState } from '../../../shared/models/tree-node.model';
+import { GIT_HASH } from '../../../../git-hash';
 
 export interface RepoSubmitEvent {
   url: string;
@@ -47,6 +48,7 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   extExpanded = false;
 
   readonly EXT_LIMIT = 12;
+  readonly gitHash = GIT_HASH;
 
   // Log-scale slider positions (0–1000); converted to bytes on change.
   fileSizePosMin = 0;

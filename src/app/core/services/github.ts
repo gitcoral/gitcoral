@@ -95,12 +95,29 @@ export class GithubService {
   // -------------------------------------------------------------------------
 
   private async get<T>(url: string, headers: Record<string, string>): Promise<T> {
-    const res = await fetch(url, { headers });
+    let res: Response;
+    try {
+      res = await fetch(url, { headers });
+    } catch {
+      throw new Error('Could not reach GitHub. Check your connection and try again.');
+    }
     if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      throw new Error(`GitHub API ${res.status}: ${body}`);
+      throw new Error(this.friendlyError(res.status));
     }
     return res.json() as Promise<T>;
+  }
+
+  private friendlyError(status: number): string {
+    switch (status) {
+      case 401: return 'Access denied. The request was not authorized.';
+      case 403: return 'GitHub rate limit reached. Please wait a moment and try again.';
+      case 404: return 'Repository not found. Check the URL and make sure it is public.';
+      case 422: return 'Repository is too large to load.';
+      case 500:
+      case 502:
+      case 503: return 'GitHub is having issues. Please try again later.';
+      default:  return `Something went wrong (HTTP ${status}). Please try again.`;
+    }
   }
 
   private makeNode(path: string, isFile: boolean, fileSize = 0): InternalNode {

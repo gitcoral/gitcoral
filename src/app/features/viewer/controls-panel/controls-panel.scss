@@ -314,3 +314,35 @@ mat-slider { margin: 0 12px; }
 
   .ext-chip--hidden & { opacity: 0.6; }
 }
+
+.panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-top: 1px solid $border;
+  flex-shrink: 0;
+}
+
+.footer-link {
+  display: flex;
+  align-items: center;
+  color: $text-dim;
+  text-decoration: none;
+
+  &:hover { color: $text; }
+}
+
+.footer-github-icon {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+.footer-hash {
+  font-size: 11px;
+  color: $text-dim;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.6;
+}
