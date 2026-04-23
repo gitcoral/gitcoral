@@ -1,10 +1,44 @@
-$bg:       #12151c;
 $border:   rgba(80, 90, 110, 0.4);
 $text:     #c8d0e0;
 $text-dim: #8899aa;
 
-:host {
-  display: block;
+@mixin icon-btn-sm {
+  width: 24px !important;
+  height: 24px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: $text-dim;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    line-height: 16px;
+  }
+
+  &:hover { color: $text; }
+}
+
+@mixin text-input {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid $border;
+  border-radius: 4px;
+  color: $text;
+  font-size: 14px;
+  padding: 8px 10px;
+  outline: none;
+
+  &::placeholder { color: $text-dim; }
+  &:focus { border-color: rgba(120, 140, 170, 0.6); }
+}
+
+:host { display: block; }
+
+:host.no-transitions * {
+  transition: none !important;
+  animation: none !important;
 }
 
 .panel {
@@ -17,9 +51,7 @@ $text-dim: #8899aa;
   overflow: hidden;
   transition: width 0.2s ease;
 
-  &.collapsed {
-    width: 36px;
-  }
+  &.collapsed { width: 36px; }
 }
 
 .panel-header {
@@ -46,7 +78,6 @@ $text-dim: #8899aa;
 .collapse-btn {
   color: $text-dim;
   flex-shrink: 0;
-
   &:hover { color: $text; }
 }
 
@@ -54,21 +85,21 @@ $text-dim: #8899aa;
   padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 0;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
+  width: 260px;
 }
 
 .section {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 14px 0;
+  padding: 8px 0;
 
   &:first-child { padding-top: 4px; }
-
-  & + & { border-top: 1px solid $border; }
+  &:last-child  { padding-bottom: 0; }
+  & + &         { border-top: 1px solid $border; }
 }
 
 .section-label {
@@ -80,10 +111,11 @@ $text-dim: #8899aa;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: $text-dim;
+  cursor: default;
+  user-select: none;
 
   &--toggle {
     cursor: pointer;
-    user-select: none;
     &:hover { color: $text; }
   }
 }
@@ -92,6 +124,7 @@ $text-dim: #8899aa;
   display: flex;
   align-items: center;
   gap: 2px;
+  height: 24px;
 }
 
 .chevron {
@@ -104,28 +137,10 @@ $text-dim: #8899aa;
   &--open { transform: rotate(90deg); }
 }
 
-.render-btn {
-  width: 100%;
-}
+.render-btn { width: 100%; }
 
-.label-btn {
-  width: 24px !important;
-  height: 24px !important;
-  padding: 0 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  color: $text-dim;
-
-  mat-icon {
-    font-size: 16px;
-    width: 16px;
-    height: 16px;
-    line-height: 16px;
-  }
-
-  &:hover { color: $text; }
-}
+.label-btn,
+.reset-btn  { @include icon-btn-sm; }
 
 .btn-content {
   display: flex;
@@ -148,7 +163,6 @@ $text-dim: #8899aa;
   to { transform: rotate(360deg); }
 }
 
-
 // Sliders
 .slider-row {
   display: flex;
@@ -162,7 +176,6 @@ $text-dim: #8899aa;
   align-items: center;
 }
 
-.section-label,
 .slider-label,
 .slider-value {
   cursor: default;
@@ -180,23 +193,12 @@ $text-dim: #8899aa;
   font-variant-numeric: tabular-nums;
 }
 
-mat-slider {
-  margin: 0 12px;
-}
+mat-slider { margin: 0 12px; }
 
 .repo-input {
+  @include text-input;
   width: 100%;
   box-sizing: border-box;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid $border;
-  border-radius: 4px;
-  color: $text;
-  font-size: 14px;
-  padding: 8px 10px;
-  outline: none;
-
-  &::placeholder { color: $text-dim; }
-  &:focus { border-color: rgba(120, 140, 170, 0.6); }
 }
 
 .query-row {
@@ -206,18 +208,9 @@ mat-slider {
 }
 
 .query-input {
+  @include text-input;
   flex: 1;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid $border;
-  border-radius: 4px;
-  color: $text;
-  font-size: 14px;
-  padding: 8px 10px;
-  outline: none;
   min-width: 0;
-
-  &::placeholder { color: $text-dim; }
-  &:focus { border-color: rgba(120, 140, 170, 0.6); }
 }
 
 .query-clear {
@@ -232,33 +225,6 @@ mat-slider {
 
   mat-icon { font-size: 16px; width: 16px; height: 16px; line-height: 16px; }
   &:hover { color: $text; }
-}
-
-
-.reset-btn {
-  width: 24px !important;
-  height: 24px !important;
-  padding: 0 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  color: $text-dim;
-
-  mat-icon {
-    font-size: 16px;
-    width: 16px;
-    height: 16px;
-    line-height: 16px;
-  }
-
-  &:hover { color: $text; }
-}
-
-.hint {
-  font-size: 12px;
-  color: $text-dim;
-  margin: 0;
-  line-height: 1.5;
 }
 
 // Extensions chip filter

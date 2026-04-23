@@ -1,4 +1,4 @@
-import { Component, ViewChild, effect, signal, untracked } from '@angular/core';
+import { Component, DestroyRef, OnInit, ViewChild, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -14,7 +14,7 @@ import { ThreeCanvas } from '../three-canvas/three-canvas';
   templateUrl: './viewer.html',
   styleUrl: './viewer.scss',
 })
-export class Viewer {
+export class Viewer implements OnInit {
 
   @ViewChild(ThreeCanvas) private threeCanvas!: ThreeCanvas;
 
@@ -43,6 +43,7 @@ export class Viewer {
   private rawRoot: TreeStructure | null = null;
   private repoName = '';
   private params: LayoutParams = { ...DEFAULT_LAYOUT_PARAMS };
+  private destroyRef = inject(DestroyRef);
 
   constructor(
     private github: GithubService,
@@ -56,14 +57,20 @@ export class Viewer {
       this.layout.error();
       if (untracked(this.status) !== 'idle') this.status.set('idle');
     });
+  }
 
-    // React to route param changes — covers initial load and browser back/forward
-    this.route.params.pipe(takeUntilDestroyed()).subscribe(params => {
+  ngOnInit(): void {
+    // React to route param changes — covers initial load and browser back/forward.
+    // In ngOnInit (not constructor) so the view renders 'idle' before 'fetching' is set,
+    // ensuring "Fetching…" is always visible on initial URL load.
+    this.route.params.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
       const { owner, repo } = params;
       if (owner && repo) {
         this.initialRepo = `${owner}/${repo}`;
         this.cameraParam = this.route.snapshot.queryParams['cam'] ?? null;
-        this.loadRepo(owner, repo);
+        // Defer to next macrotask so Angular completes its initial render (status='idle')
+        // before loadRepo sets status='fetching' — otherwise the fetching state is skipped.
+        setTimeout(() => this.loadRepo(owner, repo));
       }
     });
   }
@@ -98,6 +105,10 @@ export class Viewer {
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
+  }
+
+  onCameraReset(): void {
+    this.threeCanvas.resetToDefaultCamera();
   }
 
   onSnapshot(): void {

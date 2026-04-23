@@ -17,6 +17,9 @@
         <div class="section-label">
           <span>Repository</span>
           <div class="section-label-end" [style.visibility]="maxDepth > 0 ? 'visible' : 'hidden'">
+            <button mat-icon-button class="label-btn" (click)="onCameraReset()" [disabled]="status !== 'idle'" matTooltip="Reset camera">
+              <mat-icon>home</mat-icon>
+            </button>
             <button mat-icon-button class="label-btn" (click)="onSnapshot()" [disabled]="status !== 'idle'" matTooltip="Download PNG snapshot">
               <mat-icon>download</mat-icon>
             </button>

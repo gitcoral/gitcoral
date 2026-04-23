@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, SimpleChanges, OnChanges } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnDestroy, OnInit, Output, SimpleChanges, OnChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -25,7 +25,7 @@ export interface RepoSubmitEvent {
   templateUrl: './controls-panel.html',
   styleUrl: './controls-panel.scss',
 })
-export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
+export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestroy {
 
   @Input() status: LoadingState = 'idle';
   @Input() initialRepo = '';
@@ -36,6 +36,7 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
   @Output() paramsChange    = new EventEmitter<LayoutParams>();
   @Output() displayChange   = new EventEmitter<DisplayOptions>();
   @Output() snapshotRequest = new EventEmitter<void>();
+  @Output() cameraResetRequest = new EventEmitter<void>();
 
   repoUrl = '';
   params: LayoutParams = { ...DEFAULT_LAYOUT_PARAMS };
@@ -52,8 +53,8 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
   fileSizePosMax = 1000;
 
   readonly displayOptions: Array<{ key: keyof DisplayOptions; label: string }> = [
-    { key: 'showFolders',    label: 'Folders'    },
     { key: 'showFiles',      label: 'Files'      },
+    { key: 'showFolders',    label: 'Folders'    },
     { key: 'showConnectors', label: 'Connectors' },
   ];
 
@@ -75,6 +76,14 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
   private params$ = new Subject<LayoutParams>();
   private query$  = new Subject<void>();
   private destroy$ = new Subject<void>();
+
+  constructor(private el: ElementRef<HTMLElement>) {
+    this.el.nativeElement.classList.add('no-transitions');
+  }
+
+  ngAfterViewInit(): void {
+    requestAnimationFrame(() => this.el.nativeElement.classList.remove('no-transitions'));
+  }
 
   ngOnInit(): void {
     this.params$
@@ -186,6 +195,10 @@ export class ControlsPanel implements OnInit, OnChanges, OnDestroy {
 
   onSnapshot(): void {
     this.snapshotRequest.emit();
+  }
+
+  onCameraReset(): void {
+    this.cameraResetRequest.emit();
   }
 
   onCopyLink(): void {

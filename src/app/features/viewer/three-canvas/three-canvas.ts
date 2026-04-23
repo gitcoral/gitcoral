@@ -544,6 +544,13 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.controls.update();
   }
 
+  resetToDefaultCamera(): void {
+    this.fitCamera();
+    const r = (v: number) => Math.round(v * 100) / 100;
+    const p = this.camera.position, t = this.controls.target;
+    this.cameraChange.emit(`${r(p.x)},${r(p.y)},${r(p.z)},${r(t.x)},${r(t.y)},${r(t.z)}`);
+  }
+
   private fitCamera(): void {
     const nodes = this.result?.nodes;
     if (!nodes?.length) return;
