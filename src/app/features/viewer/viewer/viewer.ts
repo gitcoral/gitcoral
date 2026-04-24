@@ -41,7 +41,7 @@ export class Viewer implements OnInit {
   }
 
   private rawRoot: TreeStructure | null = null;
-  private repoName = '';
+  repoName = '';
   private params: LayoutParams = { ...DEFAULT_LAYOUT_PARAMS };
   private destroyRef = inject(DestroyRef);
 

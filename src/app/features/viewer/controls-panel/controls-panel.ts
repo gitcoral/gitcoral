@@ -30,6 +30,7 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
 
   @Input() status: LoadingState = 'idle';
   @Input() initialRepo = '';
+  @Input() repoName = '';
   @Input() maxFileSize = 0;
   @Input() maxDepth = 0;
   @Input() extColors: { ext: string; label: string; color: string; count: number }[] = [];
@@ -113,7 +114,7 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
       this.display.depthMax = this.maxDepth;
       this.displayChange.emit({ ...this.display });
     }
-    if (changes['extColors'] && !changes['extColors'].firstChange) {
+    if (changes['repoName'] && !changes['repoName'].firstChange) {
       // New repo loaded — reset hidden extensions, path query, and collapsed state
       this.display.hiddenExtensions = [];
       this.display.pathQuery = '';
