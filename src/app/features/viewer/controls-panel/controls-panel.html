@@ -56,9 +56,9 @@
         </button>
       </section>
 
-      <!-- Visibility — always visible -->
-      <section class="section">
-        @if (maxDepth > 0) {
+      <!-- Color by + path search — always visible -->
+      @if (maxDepth > 0) {
+        <section class="section">
           <div class="color-mode-row">
             <span class="slider-label">Color by</span>
             <div class="color-mode-btns">
@@ -71,7 +71,7 @@
             <input
               class="query-input"
               type="text"
-              placeholder="Filter by path…"
+              placeholder="Search…"
               [(ngModel)]="display.pathQuery"
               (ngModelChange)="onQueryChange()"
             />
@@ -81,72 +81,89 @@
               </button>
             }
           </div>
-        }
+        </section>
+      }
 
-        @for (opt of displayOptions; track opt.key) {
-          <mat-checkbox
-            [(ngModel)]="display[opt.key]"
-            (ngModelChange)="onDisplayChange()"
-          >{{ opt.label }}</mat-checkbox>
-        }
-
-        @if (maxFileSize > 0) {
-          <div class="slider-row">
-            <div class="slider-meta">
-              <span class="slider-label">File size</span>
-              <span class="slider-value">{{ formatBytes(display.fileSizeMin) }} – {{ formatBytes(display.fileSizeMax) }}</span>
-            </div>
-            <mat-slider min="0" max="1000" step="1">
-              <input matSliderStartThumb [(ngModel)]="fileSizePosMin" (ngModelChange)="onFileSizeChange()" />
-              <input matSliderEndThumb [(ngModel)]="fileSizePosMax" (ngModelChange)="onFileSizeChange()" />
-            </mat-slider>
+      <!-- Filter — collapsible -->
+      <section class="section">
+        <div class="section-label section-label--toggle" (click)="filterExpanded = !filterExpanded">
+          <span>Filter</span>
+          <div class="section-label-end">
+            @if (filterExpanded) {
+              <button mat-icon-button class="reset-btn" (click)="onDisplayReset(); $event.stopPropagation()" matTooltip="Reset to defaults">
+                <mat-icon>restart_alt</mat-icon>
+              </button>
+            }
+            <mat-icon class="chevron" [class.chevron--open]="filterExpanded">chevron_right</mat-icon>
           </div>
-        }
+        </div>
 
-        @if (maxDepth > 0) {
-          <div class="slider-row">
-            <div class="slider-meta">
-              <span class="slider-label">Depth</span>
-              <span class="slider-value">{{ display.depthMin }} – {{ display.depthMax }}</span>
-            </div>
-            <mat-slider [min]="0" [max]="maxDepth" step="1">
-              <input matSliderStartThumb [(ngModel)]="display.depthMin" (ngModelChange)="onDisplayChange()" />
-              <input matSliderEndThumb [(ngModel)]="display.depthMax" (ngModelChange)="onDisplayChange()" />
-            </mat-slider>
-          </div>
-        }
+        @if (filterExpanded) {
+          @for (opt of displayOptions; track opt.key) {
+            <mat-checkbox
+              [(ngModel)]="display[opt.key]"
+              (ngModelChange)="onDisplayChange()"
+            >{{ opt.label }}</mat-checkbox>
+          }
 
-        @if (extColors.length > 0) {
-          <div class="ext-row">
-            <div class="slider-meta">
-              <span class="slider-label">Extensions</span>
-              <span class="ext-actions">
-                <button class="ext-action-btn" (click)="selectAllExtensions()">All</button>
-                <button class="ext-action-btn" (click)="selectNoneExtensions()">None</button>
-              </span>
+          @if (maxFileSize > 0) {
+            <div class="slider-row">
+              <div class="slider-meta">
+                <span class="slider-label">File size</span>
+                <span class="slider-value">{{ formatBytes(display.fileSizeMin) }} – {{ formatBytes(display.fileSizeMax) }}</span>
+              </div>
+              <mat-slider min="0" max="1000" step="1">
+                <input matSliderStartThumb [(ngModel)]="fileSizePosMin" (ngModelChange)="onFileSizeChange()" />
+                <input matSliderEndThumb [(ngModel)]="fileSizePosMax" (ngModelChange)="onFileSizeChange()" />
+              </mat-slider>
             </div>
-            <div class="ext-chips">
-              @for (e of visibleExtColors; track e.ext) {
-                <button
-                  class="ext-chip"
-                  [class.ext-chip--hidden]="isExtHidden(e.ext)"
-                  (click)="toggleExtension(e.ext)"
-                >
-                  <span class="ext-dot" [style.background-color]="e.color"></span>
-                  {{ e.label }}<span class="ext-count">{{ formatCount(e.count) }}</span>
+          }
+
+          @if (maxDepth > 0) {
+            <div class="slider-row">
+              <div class="slider-meta">
+                <span class="slider-label">Depth</span>
+                <span class="slider-value">{{ display.depthMin }} – {{ display.depthMax }}</span>
+              </div>
+              <mat-slider [min]="0" [max]="maxDepth" step="1">
+                <input matSliderStartThumb [(ngModel)]="display.depthMin" (ngModelChange)="onDisplayChange()" />
+                <input matSliderEndThumb [(ngModel)]="display.depthMax" (ngModelChange)="onDisplayChange()" />
+              </mat-slider>
+            </div>
+          }
+
+          @if (extColors.length > 0) {
+            <div class="ext-row">
+              <div class="slider-meta">
+                <span class="slider-label">Extensions</span>
+                <span class="ext-actions">
+                  <button class="ext-action-btn" (click)="selectAllExtensions()">All</button>
+                  <button class="ext-action-btn" (click)="selectNoneExtensions()">None</button>
+                </span>
+              </div>
+              <div class="ext-chips">
+                @for (e of visibleExtColors; track e.ext) {
+                  <button
+                    class="ext-chip"
+                    [class.ext-chip--hidden]="isExtHidden(e.ext)"
+                    (click)="toggleExtension(e.ext)"
+                  >
+                    <span class="ext-dot" [style.background-color]="e.color"></span>
+                    {{ e.label }}<span class="ext-count">{{ formatCount(e.count) }}</span>
+                  </button>
+                }
+              </div>
+              @if (extColors.length > EXT_LIMIT) {
+                <button class="ext-expand-btn" (click)="toggleExtExpanded()">
+                  @if (extExpanded) {
+                    Collapse
+                  } @else {
+                    +{{ extColors.length - EXT_LIMIT }} more
+                  }
                 </button>
               }
             </div>
-            @if (extColors.length > EXT_LIMIT) {
-              <button class="ext-expand-btn" (click)="toggleExtExpanded()">
-                @if (extExpanded) {
-                  Collapse
-                } @else {
-                  +{{ extColors.length - EXT_LIMIT }} more
-                }
-              </button>
-            }
-          </div>
+          }
         }
       </section>
 

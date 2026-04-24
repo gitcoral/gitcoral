@@ -43,6 +43,7 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   params: LayoutParams = { ...DEFAULT_LAYOUT_PARAMS };
   display: DisplayOptions = { ...DEFAULT_DISPLAY_OPTIONS };
   collapsed = false;
+  filterExpanded = false;
   displayExpanded = false;
   layoutExpanded = false;
   extExpanded = false;
