@@ -181,6 +181,23 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
     this.displayChange.emit({ ...this.display });
   }
 
+  onFilterReset(): void {
+    this.display = {
+      ...this.display,
+      showFiles: DEFAULT_DISPLAY_OPTIONS.showFiles,
+      showFolders: DEFAULT_DISPLAY_OPTIONS.showFolders,
+      showConnectors: DEFAULT_DISPLAY_OPTIONS.showConnectors,
+      fileSizeMin: 0,
+      fileSizeMax: this.maxFileSize || Number.MAX_SAFE_INTEGER,
+      depthMin: 0,
+      depthMax: this.maxDepth || Number.MAX_SAFE_INTEGER,
+      hiddenExtensions: [],
+    };
+    this.fileSizePosMin = 0;
+    this.fileSizePosMax = 1000;
+    this.displayChange.emit({ ...this.display });
+  }
+
   onDisplayChange(): void {
     this.displayChange.emit({ ...this.display });
   }
