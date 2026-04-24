@@ -70,9 +70,18 @@ $text-dim: #8899aa;
 }
 
 .panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 14px;
   font-weight: 600;
   color: $text;
+}
+
+.panel-favicon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
 
 .collapse-btn {
@@ -306,7 +315,6 @@ mat-slider { margin: 0 12px; }
 
   &:hover { color: $text; }
 }
-
 
 .ext-count {
   font-size: 11px;
