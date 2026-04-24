@@ -315,6 +315,37 @@ mat-slider { margin: 0 12px; }
   .ext-chip--hidden & { opacity: 0.6; }
 }
 
+.color-mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.color-mode-btns {
+  display: flex;
+  gap: 2px;
+}
+
+.color-mode-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid $border;
+  border-radius: 3px;
+  color: $text-dim;
+  font-size: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+  line-height: 1.4;
+  touch-action: manipulation;
+
+  &:hover { color: $text; border-color: rgba(120, 140, 170, 0.6); }
+
+  &--active {
+    color: $text;
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(120, 140, 170, 0.6);
+  }
+}
+
 .panel-footer {
   display: flex;
   align-items: center;

@@ -31,7 +31,7 @@ import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { VERT, FRAG } from './node-shaders';
-import { DEFAULT_COLOR, buildExtColorMap, toHex } from './color-palette';
+import { DEFAULT_COLOR, buildExtColorMap, buildExtColorFn, buildDepthColorFn, buildFileSizeColorFn, toHex } from './color-palette';
 import { buildFocusSet, fileExt, hashPath, makeCbrtNormalizer, parentPath } from './scene-utils';
 
 // ---------------------------------------------------------------------------
@@ -249,7 +249,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     for (const n of nodes) (n.isFile ? allFiles : folders).push(n);
 
     const focusSet = this.selectedNode ? buildFocusSet(nodes, this.selectedNode.path) : null;
-    const colorOf  = this.buildColorMaps(allFiles, folders, nodes);
+    const colorOf  = this.buildColorFn(allFiles, folders, nodes);
     const { visibleFiles, visibleFolders, pathDimmedFiles, pathDimmedFolders, foldersWithContent, inDepthRange } = this.computeVisibility(allFiles, folders);
 
     const { fileDotMin, fileDotMax, folderDotMin, folderDotMax } = this.display;
@@ -294,29 +294,25 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.sceneObjects = [];
   }
 
-  // Builds extension and folder color maps, emits extColorsChange when the result changes,
-  // and updates this.colorOf. Returns colorOf for use in the current render pass.
-  private buildColorMaps(
+  // Emits extColorsChange when the result changes (always extension-based, independent of
+  // colorMode), then builds and returns a colorOf function for the active color mode.
+  private buildColorFn(
     allFiles: PositionedNode[],
     folders:  PositionedNode[],
     nodes:    PositionedNode[],
   ): (n: PositionedNode) => Color {
-    const extCounts = new Map<string, number>();
-    let noExtCount = 0;
-    for (const n of allFiles) {
-      const ext = fileExt(n.path);
-      if (ext) extCounts.set(ext, (extCounts.get(ext) ?? 0) + 1);
-      else noExtCount++;
-    }
-    const colorMap  = buildExtColorMap(extCounts);
-    const fileColor = (path: string): Color => {
-      const ext = fileExt(path);
-      return ext ? (colorMap.get(ext) ?? DEFAULT_COLOR) : DEFAULT_COLOR;
-    };
-
+    // Always compute extension data — needed for the chip filter regardless of color mode.
     if (this.result !== this.lastEmittedResult) {
       this.lastEmittedResult = this.result;
-      const list = [...colorMap.entries()].map(([ext, color]) => ({
+      const extCounts = new Map<string, number>();
+      let noExtCount = 0;
+      for (const n of allFiles) {
+        const ext = fileExt(n.path);
+        if (ext) extCounts.set(ext, (extCounts.get(ext) ?? 0) + 1);
+        else noExtCount++;
+      }
+      const extColorMap = buildExtColorMap(extCounts);
+      const list = [...extColorMap.entries()].map(([ext, color]) => ({
         ext, label: ext, color: toHex(color), count: extCounts.get(ext) ?? 0,
       }));
       if (noExtCount > 0) {
@@ -327,27 +323,11 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       this.extColorsChange.emit(list);
     }
 
-    // Bottom-up: average children's colors into each folder (deepest folders first)
-    const childrenOf = new Map<string, PositionedNode[]>();
-    for (const n of nodes) {
-      const p = parentPath(n.path);
-      if (!childrenOf.has(p)) childrenOf.set(p, []);
-      childrenOf.get(p)!.push(n);
+    switch (this.display.colorMode) {
+      case 'depth':    this.colorOf = buildDepthColorFn(nodes);                  break;
+      case 'fileSize': this.colorOf = buildFileSizeColorFn(nodes);               break;
+      default:         this.colorOf = buildExtColorFn(allFiles, folders, nodes); break;
     }
-    const folderColorMap = new Map<string, Color>();
-    for (const folder of [...folders].sort((a, b) => b.path.split('/').length - a.path.split('/').length)) {
-      const children = childrenOf.get(folder.path) ?? [];
-      if (!children.length) { folderColorMap.set(folder.path, DEFAULT_COLOR); continue; }
-      let r = 0, g = 0, b = 0;
-      for (const child of children) {
-        const c = child.isFile ? fileColor(child.path) : (folderColorMap.get(child.path) ?? DEFAULT_COLOR);
-        r += c.r; g += c.g; b += c.b;
-      }
-      folderColorMap.set(folder.path, new Color(r / children.length, g / children.length, b / children.length));
-    }
-
-    this.colorOf = (n: PositionedNode): Color =>
-      n.isFile ? fileColor(n.path) : (folderColorMap.get(n.path) ?? DEFAULT_COLOR);
     return this.colorOf;
   }
 

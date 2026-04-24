@@ -49,7 +49,10 @@ export const DEFAULT_LAYOUT_PARAMS: LayoutParams = {
 
 export type LoadingState = 'idle' | 'fetching' | 'computing';
 
+export type ColorMode = 'extension' | 'depth' | 'fileSize';
+
 export interface DisplayOptions {
+  colorMode: ColorMode;
   showFolders: boolean;
   showFiles: boolean;
   showConnectors: boolean;
@@ -70,6 +73,7 @@ export interface DisplayOptions {
 }
 
 export const DEFAULT_DISPLAY_OPTIONS: DisplayOptions = {
+  colorMode: 'extension',
   showFolders: true,
   showFiles: true,
   showConnectors: true,
