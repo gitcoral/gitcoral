@@ -285,6 +285,14 @@ mat-slider { margin: 0 12px; }
   }
 }
 
+.ext-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 .ext-expand-btn {
   background: none;
   border: none;
@@ -299,13 +307,6 @@ mat-slider { margin: 0 12px; }
   &:hover { color: $text; }
 }
 
-.ext-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
 
 .ext-count {
   font-size: 11px;
