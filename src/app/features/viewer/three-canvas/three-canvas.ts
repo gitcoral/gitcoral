@@ -630,8 +630,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
         const dx = mouseX - sx;
         const dy = mouseY - sy;
 
-        // aSize is the point diameter in CSS pixels (gl_PointSize = aSize * devicePixelRatio)
-        const radius = sizAttr.getX(i) / 2;
+        // aSize is the point diameter in CSS pixels; use a minimum hit radius so small dots remain hoverable
+        const radius = Math.max(sizAttr.getX(i) / 2, 6);
         if (dx * dx + dy * dy > radius * radius) continue;
 
         // Among overlapping points pick the one closest to camera (smallest NDC z)
