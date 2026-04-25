@@ -594,7 +594,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   // Raycasting (hover + click)
   // ---------------------------------------------------------------------------
 
-  private raycast(event: MouseEvent): { node: PositionedNode; worldPos: Vector3 } | null {
+  private raycast(event: MouseEvent, exclude?: Set<string>): { node: PositionedNode; worldPos: Vector3 } | null {
     const canvas = this.canvasRef.nativeElement;
     const rect   = canvas.getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
@@ -615,6 +615,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       const sizAttr = obj.geometry.getAttribute('aSize')    as BufferAttribute;
 
       for (let i = 0; i < nodes.length; i++) {
+        if (exclude?.has(nodes[i].path)) continue;
+
         proj.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
         const worldPos = proj.clone();
         proj.project(this.camera); // → NDC
@@ -681,8 +683,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       return;
     }
 
-    const hit = this.raycast(e);
-    if (hit && !this.pathDimmedPaths.has(hit.node.path)) {
+    const hit = this.raycast(e, this.pathDimmedPaths);
+    if (hit) {
       this.showTooltip(hit.node, hit.worldPos);
       this.canvasRef.nativeElement.style.cursor = 'pointer';
     } else {
@@ -704,8 +706,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const dy = e.clientY - this.mouseDownY;
     if (dx * dx + dy * dy > 16) return; // drag, not click
 
-    const hit = this.raycast(e);
-    if (hit && !this.pathDimmedPaths.has(hit.node.path)) {
+    const hit = this.raycast(e, this.pathDimmedPaths);
+    if (hit) {
       const isToggle = this.selectedNode?.path === hit.node.path;
       this.selectedNode = isToggle ? null : hit.node;
       if (isToggle) {
