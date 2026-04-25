@@ -46,8 +46,8 @@ Enter any public repo URL, hit **Render**, and in seconds you get an interactive
 | Mode | Description |
 |------|-------------|
 | **By type** | Each file extension gets a unique color — spot your `.ts`, `.py`, `.md` at a glance |
-| **By depth** | Color encodes how deep in the tree a node lives |
 | **By size** | Hotter = larger file; instantly find the heavy files |
+| **By depth** | Color encodes how deep in the tree a node lives |
 
 ### Filtering & Search
 - **Path search** — type a fragment to highlight matching files and dim everything else
@@ -123,16 +123,11 @@ ng test
 
 ## How It Works
 
-```
-GitHub API                  Layout Worker               Three.js Renderer
-──────────────              ─────────────               ─────────────────
-/repos/:owner/:repo  →  TreeStructure  →  Web Worker  →  PositionedNode[]
-  default branch            (recursive       (physics-       (x, y, z,
-  → commit SHA              tree fetch)       based 3D        color,
-  → git tree                                 placement)       size)
-                                                                 ↓
-                                                         WebGL point cloud
-                                                         + line segments
+```mermaid
+flowchart LR
+    A["GitHub API\n(/repos, /commits, /git/trees)"] -->|"TreeStructure"| B["Web Worker\n(physics layout)"]
+    B -->|"PositionedNode[ ]"| C["Three.js Renderer\n(WebGL)"]
+    C --> D["Point cloud\n+ line segments"]
 ```
 
 1. **Fetch** — three GitHub API calls resolve the default branch, HEAD commit, and full recursive file tree
@@ -140,8 +135,6 @@ GitHub API                  Layout Worker               Three.js Renderer
 3. **Layout** — a Web Worker places every node in 3D space using a physics-inspired algorithm (buoyancy, repulsion, sphere packing)
 4. **Render** — Three.js draws files as billboard points via a custom GLSL shader and folders as connector endpoints via `LineSegments2`
 5. **Interact** — a screen-space raycast on every pointer move finds the nearest node within a pixel radius for hover and click selection
-
----
 
 Built with [Angular 21](https://angular.dev), [Three.js](https://threejs.org) 0.183 (custom GLSL shaders, `LineSegments2`), [Web Workers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API) for off-thread layout, and the [GitHub REST API](https://docs.github.com/en/rest) — no backend.
 
