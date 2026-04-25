@@ -70,11 +70,10 @@ Fine-tune the physics of the 3D layout with live sliders:
 - **Shareable URLs** — camera position, color mode, and search query are encoded in the URL; copy and share to show exactly what you see
 - **PNG snapshot** — download a high-resolution screenshot of the current view with one click
 
-### Works out of the box
+### Notes
 - Supports `github.com/owner/repo`, SSH URLs, and short `owner/repo` form
 - Layout computation runs in a **Web Worker** — the UI stays responsive while big repos are processed
 - No authentication needed for public repositories — unauthenticated GitHub API requests are rate-limited to 60/hour per IP; if you hit the limit, wait a minute and try again
-- No backend — runs entirely in the browser
 
 ---
 
