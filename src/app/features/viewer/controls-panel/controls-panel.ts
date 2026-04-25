@@ -6,7 +6,7 @@ import { MatSliderModule } from '@angular/material/slider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Subject, debounceTime, takeUntil } from 'rxjs';
-import { DEFAULT_DISPLAY_OPTIONS, DEFAULT_LAYOUT_PARAMS, DisplayOptions, LayoutParams, LoadingState } from '../../../shared/models/tree-node.model';
+import { ColorMode, DEFAULT_DISPLAY_OPTIONS, DEFAULT_LAYOUT_PARAMS, DisplayOptions, LayoutParams, LoadingState } from '../../../shared/models/tree-node.model';
 import { GIT_HASH } from '../../../../git-hash';
 
 export interface RepoSubmitEvent {
@@ -30,6 +30,8 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
 
   @Input() status: LoadingState = 'idle';
   @Input() initialRepo = '';
+  @Input() initialQuery = '';
+  @Input() initialColorMode: ColorMode = 'type';
   @Input() repoName = '';
   @Input() maxFileSize = 0;
   @Input() maxDepth = 0;
@@ -109,6 +111,12 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
     if (changes['initialRepo'] && this.initialRepo && !this.repoUrl) {
       this.repoUrl = this.initialRepo;
     }
+    if (changes['initialQuery'] && this.initialQuery) {
+      this.display.pathQuery = this.initialQuery;
+    }
+    if (changes['initialColorMode'] && this.initialColorMode !== 'type') {
+      this.display.colorMode = this.initialColorMode;
+    }
     if (changes['maxFileSize'] && this.maxFileSize > 0) {
       this.fileSizePosMin = 0;
       this.fileSizePosMax = 1000;
@@ -121,8 +129,8 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
       this.display.depthMax = this.maxDepth;
       this.displayChange.emit({ ...this.display });
     }
-    if (changes['repoName'] && !changes['repoName'].firstChange) {
-      // New repo loaded — reset hidden extensions, path query, and collapsed state
+    if (changes['repoName'] && !changes['repoName'].firstChange && changes['repoName'].previousValue) {
+      // User switched repos — reset hidden extensions, path query, and collapsed state
       this.display.hiddenExtensions = [];
       this.display.pathQuery = '';
       this.extExpanded = false;

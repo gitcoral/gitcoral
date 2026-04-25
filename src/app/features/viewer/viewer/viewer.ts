@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 
 import { GithubService } from '../../../core/services/github';
 import { LayoutService } from '../../../core/services/layout';
-import { DEFAULT_DISPLAY_OPTIONS, DEFAULT_LAYOUT_PARAMS, DisplayOptions, LayoutParams, LoadingState, TreeStructure } from '../../../shared/models/tree-node.model';
+import { ColorMode, DEFAULT_DISPLAY_OPTIONS, DEFAULT_LAYOUT_PARAMS, DisplayOptions, LayoutParams, LoadingState, TreeStructure } from '../../../shared/models/tree-node.model';
 import { ControlsPanel, RepoSubmitEvent } from '../controls-panel/controls-panel';
 import { ThreeCanvas } from '../three-canvas/three-canvas';
 
@@ -24,6 +24,8 @@ export class Viewer implements OnInit {
   status = signal<LoadingState>('idle');
   initialRepo = '';
   cameraParam: string | null = null;
+  initialQuery = '';
+  initialColorMode: ColorMode = 'type';
 
   get result() { return this.layout.result; }
   get error()  { return this.layout.error; }
@@ -68,6 +70,12 @@ export class Viewer implements OnInit {
       if (owner && repo) {
         this.initialRepo = `${owner}/${repo}`;
         this.cameraParam = this.route.snapshot.queryParams['cam'] ?? null;
+        const q = this.route.snapshot.queryParams['q'] ?? '';
+        const color = this.route.snapshot.queryParams['color'] ?? '';
+        this.initialQuery = q;
+        this.initialColorMode = (['type', 'depth', 'size'] as ColorMode[]).includes(color as ColorMode)
+          ? color as ColorMode : 'type';
+        this.display = { ...DEFAULT_DISPLAY_OPTIONS, pathQuery: q, colorMode: this.initialColorMode };
         // Defer to next macrotask so Angular completes its initial render (status='idle')
         // before loadRepo sets status='fetching' — otherwise the fetching state is skipped.
         setTimeout(() => this.loadRepo(owner, repo));
@@ -96,6 +104,19 @@ export class Viewer implements OnInit {
       this.layout.error.set(e instanceof Error ? e.message : String(e));
       this.status.set('idle');
     }
+  }
+
+  onDisplayChange(display: DisplayOptions): void {
+    this.display = display;
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        q:     display.pathQuery  || null,
+        color: display.colorMode !== 'type' ? display.colorMode : null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   onCameraChange(cam: string): void {

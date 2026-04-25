@@ -75,9 +75,9 @@
           <div class="color-mode-row">
             <span class="slider-label">Color by</span>
             <div class="color-mode-btns">
-              <button class="color-mode-btn" [class.color-mode-btn--active]="display.colorMode === 'extension'" (click)="display.colorMode = 'extension'; onDisplayChange()" matTooltip="Color by file type">Type</button>
-              <button class="color-mode-btn" [class.color-mode-btn--active]="display.colorMode === 'fileSize'"  (click)="display.colorMode = 'fileSize';  onDisplayChange()" matTooltip="Color by file size">Size</button>
-              <button class="color-mode-btn" [class.color-mode-btn--active]="display.colorMode === 'depth'"     (click)="display.colorMode = 'depth';     onDisplayChange()" matTooltip="Color by folder depth">Depth</button>
+              <button class="color-mode-btn" [class.color-mode-btn--active]="display.colorMode === 'type'"  (click)="display.colorMode = 'type';  onDisplayChange()" matTooltip="Color by file type">Type</button>
+              <button class="color-mode-btn" [class.color-mode-btn--active]="display.colorMode === 'size'"  (click)="display.colorMode = 'size';  onDisplayChange()" matTooltip="Color by file size">Size</button>
+              <button class="color-mode-btn" [class.color-mode-btn--active]="display.colorMode === 'depth'" (click)="display.colorMode = 'depth'; onDisplayChange()" matTooltip="Color by folder depth">Depth</button>
             </div>
           </div>
           <div class="query-row">

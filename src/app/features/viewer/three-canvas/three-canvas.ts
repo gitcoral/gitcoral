@@ -324,9 +324,9 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     }
 
     switch (this.display.colorMode) {
-      case 'depth':    this.colorOf = buildDepthColorFn(nodes);                  break;
-      case 'fileSize': this.colorOf = buildFileSizeColorFn(nodes);               break;
-      default:         this.colorOf = buildExtColorFn(allFiles, folders, nodes); break;
+      case 'depth': this.colorOf = buildDepthColorFn(nodes);                  break;
+      case 'size':  this.colorOf = buildFileSizeColorFn(nodes);               break;
+      default:      this.colorOf = buildExtColorFn(allFiles, folders, nodes); break;
     }
     return this.colorOf;
   }
