@@ -78,18 +78,6 @@ Fine-tune the physics of the 3D layout with live sliders:
 
 ---
 
-## Try it
-
-Three example repos are built in — click any to load instantly:
-
-| Repo | What you'll see |
-|------|-----------------|
-| `facebook/react` | A moderately deep JS monorepo with a rich extension palette |
-| `angular/angular` | A large TypeScript project with dense package layering |
-| `torvalds/linux` | 70 k+ files across dozens of subsystems — stress-test the renderer |
-
----
-
 ## Getting Started
 
 ### Prerequisites
@@ -155,17 +143,7 @@ GitHub API                  Layout Worker               Three.js Renderer
 
 ---
 
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Framework | [Angular 21](https://angular.dev) with standalone components and signals |
-| 3D rendering | [Three.js](https://threejs.org) 0.183 — WebGL, custom GLSL shaders, `LineSegments2` |
-| Off-thread compute | [Web Workers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API) for non-blocking layout |
-| UI components | [Angular Material](https://material.angular.io) |
-| Styling | SCSS |
-| Testing | [Vitest](https://vitest.dev) via Angular CLI |
-| Data source | [GitHub REST API](https://docs.github.com/en/rest) (public, unauthenticated) |
+Built with [Angular 21](https://angular.dev), [Three.js](https://threejs.org) 0.183 (custom GLSL shaders, `LineSegments2`), [Web Workers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API) for off-thread layout, and the [GitHub REST API](https://docs.github.com/en/rest) — no backend.
 
 ---
 
