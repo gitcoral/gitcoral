@@ -41,6 +41,7 @@ Enter any public repo URL, hit **Render**, and in seconds you get an interactive
 - **Hierarchy layers** — depth encoded on the vertical axis so structure is immediately readable
 - **Connectors** — animated lines linking parent folders to their children
 - **Orbit controls** — click and drag to rotate, scroll to zoom, right-click to pan
+- **Auto-orbit** — one-click continuous rotation; grabbing the canvas stops it instantly
 
 ### Color Modes
 | Mode | Description |
