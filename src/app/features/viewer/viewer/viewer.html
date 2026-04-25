@@ -1,7 +1,7 @@
 <div class="viewer-shell">
 
   <div class="canvas-area">
-    <app-three-canvas class="canvas" [result]="result()" [resetCamera]="resetCamera" [display]="display" [cameraParam]="cameraParam" (extColorsChange)="extColors = $event" (cameraChange)="onCameraChange($event)" />
+    <app-three-canvas class="canvas" [result]="result()" [resetCamera]="resetCamera" [display]="display" [cameraParam]="cameraParam" [autoOrbit]="autoOrbit" (extColorsChange)="extColors = $event" (cameraChange)="onCameraChange($event)" (autoOrbitChange)="autoOrbit = $event" />
   </div>
 
   <aside class="sidebar">
@@ -14,7 +14,9 @@
       [maxFileSize]="maxFileSize"
       [maxDepth]="maxDepth"
       [extColors]="extColors"
+      [autoOrbit]="autoOrbit"
       (repoSubmit)="onRepoSubmit($event)"
+      (autoOrbitToggle)="onAutoOrbitToggle()"
       (paramsChange)="onParamsChange($event)"
       (displayChange)="onDisplayChange($event)"
       (snapshotRequest)="onSnapshot()"

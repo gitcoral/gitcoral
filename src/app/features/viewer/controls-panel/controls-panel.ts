@@ -36,7 +36,9 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   @Input() maxFileSize = 0;
   @Input() maxDepth = 0;
   @Input() extColors: { ext: string; label: string; color: string; count: number }[] = [];
+  @Input() autoOrbit = false;
   @Output() repoSubmit      = new EventEmitter<RepoSubmitEvent>();
+  @Output() autoOrbitToggle = new EventEmitter<void>();
   @Output() paramsChange    = new EventEmitter<LayoutParams>();
   @Output() displayChange   = new EventEmitter<DisplayOptions>();
   @Output() snapshotRequest = new EventEmitter<void>();
@@ -252,6 +254,10 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   onExampleClick(repo: string): void {
     this.repoUrl = repo;
     this.repoSubmit.emit({ url: repo });
+  }
+
+  onAutoOrbitToggle(): void {
+    this.autoOrbitToggle.emit();
   }
 
   onHomeClick(): void {

@@ -59,8 +59,10 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   @Input() resetCamera = false;
   @Input() display: DisplayOptions = { ...DEFAULT_DISPLAY_OPTIONS };
   @Input() cameraParam: string | null = null;
+  @Input() autoOrbit = false;
   @Output() extColorsChange = new EventEmitter<{ ext: string; label: string; color: string; count: number }[]>();
   @Output() cameraChange = new EventEmitter<string>();
+  @Output() autoOrbitChange = new EventEmitter<boolean>();
   @ViewChild('canvas', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
 
   private renderer!: WebGLRenderer;
@@ -121,6 +123,9 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
   ngOnChanges(changes: SimpleChanges): void {
     if (!this.renderer) return;
+    if (changes['autoOrbit']) {
+      this.controls.autoRotate = this.autoOrbit;
+    }
     if (changes['result']) {
       this.selectedNode = null;
       this.hideTooltip();
@@ -181,10 +186,12 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.controls.enableDamping  = true;
     this.controls.dampingFactor  = 0.08;
     this.controls.screenSpacePanning = false;
+    this.controls.autoRotateSpeed = 0.8;
     this.controls.addEventListener('start', () => {
       this.isOrbiting = true;
       this.canvasRef.nativeElement.style.cursor = '';
       if (!this.selectedNode) this.hideTooltip();
+      if (this.autoOrbit) this.autoOrbitChange.emit(false);
     });
     this.controls.addEventListener('change', () => { if (this.isOrbiting) this.didOrbit = true; });
     this.controls.addEventListener('end', () => {

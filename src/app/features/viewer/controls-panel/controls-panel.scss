@@ -158,6 +158,8 @@ $text-dim: #8899aa;
 .label-btn,
 .reset-btn  { @include icon-btn-sm; }
 
+.label-btn--active { color: $text !important; }
+
 .btn-content {
   display: flex;
   align-items: center;
