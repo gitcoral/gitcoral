@@ -158,7 +158,11 @@ $text-dim: #8899aa;
 .label-btn,
 .reset-btn  { @include icon-btn-sm; }
 
-.label-btn--active { color: $text !important; }
+.label-btn--active {
+  color: $text !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-radius: 4px;
+}
 
 .btn-content {
   display: flex;
