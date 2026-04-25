@@ -147,6 +147,7 @@ export class Viewer implements OnInit {
   onHome(): void {
     this.rawRoot = null;
     this.repoName = '';
+    this.initialRepo = '';
     this.extColors = [];
     this.layout.result.set(null);
     this.layout.error.set(null);

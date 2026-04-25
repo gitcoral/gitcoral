@@ -59,8 +59,8 @@
         </button>
       </section>
 
-      <!-- Example repos — shown when no repo is loaded -->
-      @if (maxDepth === 0) {
+      <!-- Example repos — shown when no repo is loaded and none is being fetched -->
+      @if (maxDepth === 0 && !initialRepo) {
         <section class="section">
           <div class="section-label">Examples</div>
           @for (ex of examples; track ex.repo) {
@@ -72,8 +72,8 @@
         </section>
       }
 
-      <!-- Color by + path search — always visible -->
-      @if (maxDepth > 0) {
+      <!-- Color by + path search — visible when repo is loaded or loading -->
+      @if (maxDepth > 0 || status !== 'idle') {
         <section class="section">
           <div class="color-mode-row">
             <span class="slider-label">Color by</span>
@@ -100,7 +100,7 @@
         </section>
       }
 
-      @if (maxDepth > 0) {
+      @if (maxDepth > 0 || status !== 'idle') {
       <!-- Filter — collapsible -->
       <section class="section">
         <div class="section-label section-label--toggle" (click)="filterExpanded = !filterExpanded">
