@@ -2,10 +2,10 @@
 
   <div class="panel-header">
     @if (!collapsed) {
-      <span class="panel-title">
+      <button class="panel-title" (click)="onHomeClick()">
         <img class="panel-favicon" src="/favicon.svg" alt="GitCoral logo" />
         GitCoral
-      </span>
+      </button>
     }
     <button mat-icon-button class="collapse-btn" (click)="toggleCollapse()">
       <mat-icon>{{ collapsed ? 'chevron_left' : 'chevron_right' }}</mat-icon>
@@ -56,6 +56,19 @@
         </button>
       </section>
 
+      <!-- Example repos — shown when no repo is loaded -->
+      @if (maxDepth === 0) {
+        <section class="section">
+          <div class="section-label">Examples</div>
+          @for (ex of examples; track ex.repo) {
+            <button class="example-card" (click)="onExampleClick(ex.repo)" [disabled]="status !== 'idle'">
+              <span class="example-name">{{ ex.repo }}</span>
+              <img class="example-thumb" [src]="ex.image" [alt]="ex.repo" />
+            </button>
+          }
+        </section>
+      }
+
       <!-- Color by + path search — always visible -->
       @if (maxDepth > 0) {
         <section class="section">
@@ -84,6 +97,7 @@
         </section>
       }
 
+      @if (maxDepth > 0) {
       <!-- Filter — collapsible -->
       <section class="section">
         <div class="section-label section-label--toggle" (click)="filterExpanded = !filterExpanded">
@@ -256,6 +270,7 @@
           }
         }
       </section>
+      } <!-- end @if (maxDepth > 0) for Filter/Display/Layout -->
 
     </div>
 

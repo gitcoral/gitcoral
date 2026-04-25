@@ -22,7 +22,7 @@
 
 ## P2 — Before any big push
 
-- [ ] **Mobile responsiveness** — the sidebar is 260px fixed width with no media queries; test on phones and add breakpoints so it doesn't overflow on small screens
+- [x] **Mobile responsiveness** — tested on iPhone 14 Pro, looks good as-is
 
 - [ ] **Example repos in empty state** — even without a full landing page, clickable examples on the empty input state let visitors see the app in action in one click
 

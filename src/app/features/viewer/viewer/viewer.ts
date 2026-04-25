@@ -118,6 +118,15 @@ export class Viewer implements OnInit {
     this.threeCanvas.takeSnapshot(filename);
   }
 
+  onHome(): void {
+    this.rawRoot = null;
+    this.repoName = '';
+    this.extColors = [];
+    this.layout.result.set(null);
+    this.layout.error.set(null);
+    this.router.navigate(['']);
+  }
+
   onParamsChange(params: LayoutParams): void {
     this.params = params;
     if (this.rawRoot) {

@@ -39,6 +39,7 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   @Output() displayChange   = new EventEmitter<DisplayOptions>();
   @Output() snapshotRequest = new EventEmitter<void>();
   @Output() cameraResetRequest = new EventEmitter<void>();
+  @Output() homeRequest     = new EventEmitter<void>();
 
   repoUrl = '';
   params: LayoutParams = { ...DEFAULT_LAYOUT_PARAMS };
@@ -51,6 +52,12 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
 
   readonly EXT_LIMIT = 12;
   readonly gitHash = GIT_HASH;
+
+  readonly examples = [
+    { repo: 'facebook/react',  image: '/examples/facebook-react.svg'  },
+    { repo: 'torvalds/linux',  image: '/examples/torvalds-linux.svg'  },
+    { repo: 'angular/angular', image: '/examples/angular-angular.svg' },
+  ];
 
   // Log-scale slider positions (0–1000); converted to bytes on change.
   fileSizePosMin = 0;
@@ -232,6 +239,15 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   onSubmit(): void {
     const url = this.repoUrl.trim();
     if (url) this.repoSubmit.emit({ url });
+  }
+
+  onExampleClick(repo: string): void {
+    this.repoUrl = repo;
+    this.repoSubmit.emit({ url: repo });
+  }
+
+  onHomeClick(): void {
+    this.homeRequest.emit();
   }
 
   onFileSizeChange(): void {
