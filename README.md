@@ -75,6 +75,7 @@ Fine-tune the physics of the 3D layout with live sliders:
 - Supports `github.com/owner/repo`, SSH URLs, and short `owner/repo` form
 - Layout computation runs in a **Web Worker** — the UI stays responsive while big repos are processed
 - No authentication needed for public repositories
+- No backend — runs entirely in the browser
 
 ---
 
@@ -133,8 +134,6 @@ GitHub REST API    →    Web Worker      →    Three.js Renderer
 3. **Layout** — a Web Worker places every node in 3D space using a physics-inspired algorithm (buoyancy, repulsion, sphere packing)
 4. **Render** — Three.js draws files as billboard points via a custom GLSL shader and folders as connector endpoints via `LineSegments2`
 5. **Interact** — a screen-space raycast on every pointer move finds the nearest node within a pixel radius for hover and click selection
-
-Built with [Angular 21](https://angular.dev), [Three.js](https://threejs.org) 0.183 (custom GLSL shaders, `LineSegments2`), [Web Workers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API) for off-thread layout, and the [GitHub REST API](https://docs.github.com/en/rest) — no backend.
 
 ---
 
