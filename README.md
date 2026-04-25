@@ -123,11 +123,9 @@ ng test
 
 ## How It Works
 
-```mermaid
-flowchart LR
-    A["GitHub API\n(/repos, /commits, /git/trees)"] -->|"TreeStructure"| B["Web Worker\n(physics layout)"]
-    B -->|"PositionedNode[ ]"| C["Three.js Renderer\n(WebGL)"]
-    C --> D["Point cloud\n+ line segments"]
+```
+GitHub REST API    →    Web Worker      →    Three.js Renderer
+(3 API calls)           (3D layout)          (WebGL)
 ```
 
 1. **Fetch** — three GitHub API calls resolve the default branch, HEAD commit, and full recursive file tree
