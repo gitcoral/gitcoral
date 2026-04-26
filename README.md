@@ -21,6 +21,7 @@
     <img src="https://img.shields.io/badge/TypeScript-5-blue?logo=typescript&logoColor=white" alt="TypeScript" />
     <img src="https://img.shields.io/badge/WebGL-powered-green?logo=webgl&logoColor=white" alt="WebGL" />
     <img src="https://img.shields.io/badge/license-MIT-brightgreen" alt="MIT License" />
+    <img src="https://github.com/moikot/gitcoral/actions/workflows/ci.yml/badge.svg" alt="CI" />
   </p>
 </div>
 
