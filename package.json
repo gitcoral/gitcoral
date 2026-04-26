@@ -30,6 +30,9 @@
     "three": "^0.183.2",
     "tslib": "^2.3.0"
   },
+  "overrides": {
+    "vite": "^7.3.2"
+  },
   "devDependencies": {
     "@angular/build": "^21.2.6",
     "@angular/cli": "^21.2.6",
