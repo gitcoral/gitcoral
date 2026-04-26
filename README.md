@@ -11,19 +11,30 @@
 
   <p>
     <a href="https://gitcoral.com"><strong>Live Demo →</strong></a> ·
-    <a href="https://github.com/moikot/gitcoral/issues">Report Bug</a> ·
-    <a href="https://github.com/moikot/gitcoral/issues">Request Feature</a>
+    <a href="https://github.com/moikot/gitcoral/issues/new?template=bug_report.md">Report Bug</a> ·
+    <a href="https://github.com/moikot/gitcoral/issues/new?template=feature_request.md">Request Feature</a>
   </p>
 
   <p>
-    <img src="https://img.shields.io/badge/Angular-21-red?logo=angular&logoColor=white" alt="Angular 21" />
-    <img src="https://img.shields.io/badge/Three.js-0.183-black?logo=threedotjs&logoColor=white" alt="Three.js" />
-    <img src="https://img.shields.io/badge/TypeScript-5-blue?logo=typescript&logoColor=white" alt="TypeScript" />
-    <img src="https://img.shields.io/badge/WebGL-powered-green?logo=webgl&logoColor=white" alt="WebGL" />
-    <img src="https://img.shields.io/badge/license-MIT-brightgreen" alt="MIT License" />
-    <img src="https://github.com/moikot/gitcoral/actions/workflows/ci.yml/badge.svg" alt="CI" />
+    <a href="https://angular.dev"><img src="https://img.shields.io/badge/Angular-21-red?logo=angular&logoColor=white" alt="Angular 21" /></a>
+    <a href="https://threejs.org"><img src="https://img.shields.io/badge/Three.js-0.183-black?logo=threedotjs&logoColor=white" alt="Three.js" /></a>
+    <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-5-blue?logo=typescript&logoColor=white" alt="TypeScript" /></a>
+    <a href="https://www.khronos.org/webgl/"><img src="https://img.shields.io/badge/WebGL-powered-green?logo=webgl&logoColor=white" alt="WebGL" /></a>
+    <a href="https://github.com/moikot/gitcoral/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-brightgreen" alt="MIT License" /></a>
+    <a href="https://github.com/moikot/gitcoral/actions/workflows/ci.yml"><img src="https://github.com/moikot/gitcoral/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   </p>
 </div>
+
+---
+
+## Table of Contents
+
+- [What is GitCoral?](#what-is-gitcoral)
+- [Features](#features)
+- [Getting Started](#getting-started)
+- [How It Works](#how-it-works)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
@@ -81,7 +92,8 @@ Fine-tune the physics of the 3D layout with live sliders:
 
 - Supports `github.com/owner/repo`, SSH URLs, and short `owner/repo` form
 - Layout computation runs in a **Web Worker** — the UI stays responsive while big repos are processed
-- No authentication needed for public repositories — unauthenticated GitHub API requests are rate-limited to 60/hour per IP; if you hit the limit, wait a minute and try again
+
+> **Rate limits:** Unauthenticated GitHub API requests are capped at **60/hour per IP**. If you hit the limit, wait a minute and try again.
 
 ---
 

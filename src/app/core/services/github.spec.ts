@@ -29,6 +29,13 @@ describe('GithubService', () => {
       });
     });
 
+    it('parses SSH URL with org-N@ prefix', () => {
+      expect(service.parseRepoUrl('org-69631@github.com:facebook/react.git')).toEqual({
+        owner: 'facebook',
+        repo: 'react',
+      });
+    });
+
     it('parses HTTPS URL', () => {
       expect(service.parseRepoUrl('https://github.com/owner/repo')).toEqual({
         owner: 'owner',

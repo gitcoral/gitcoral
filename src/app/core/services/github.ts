@@ -37,8 +37,8 @@ export class GithubService {
   parseRepoUrl(url: string): { owner: string; repo: string } | null {
     const s = url.trim().replace(/\/$/, '');
 
-    // SSH: git@github.com:owner/repo.git
-    const ssh = s.match(/^git@github\.com:([^/]+)\/([^/.]+)(?:\.git)?$/);
+    // SSH: git@github.com:owner/repo.git or org-69631@github.com:owner/repo.git
+    const ssh = s.match(/^[^@]+@github\.com:([^/]+)\/([^/.]+)(?:\.git)?$/);
     if (ssh) return { owner: ssh[1], repo: ssh[2] };
 
     // HTTPS: https://github.com/owner/repo
