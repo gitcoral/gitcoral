@@ -17,9 +17,9 @@ export function toHex(c: Color): string {
 export function buildExtColorMap(extCounts: Map<string, number>): Map<string, Color> {
   const GOLDEN = 0.61803398875;
   const sorted = [...extCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  const map    = new Map<string, Color>();
+  const map = new Map<string, Color>();
   for (let i = 0; i < sorted.length; i++) {
-    const hue       = Math.round((i * GOLDEN % 1) * 360);
+    const hue = Math.round(((i * GOLDEN) % 1) * 360);
     const lightness = i % 2 === 0 ? 65 : 75;
     map.set(sorted[i][0], new Color(`hsl(${hue},80%,${lightness}%)`));
   }
@@ -28,7 +28,7 @@ export function buildExtColorMap(extCounts: Map<string, number>): Map<string, Co
 
 export function buildExtColorFn(
   allFiles: PositionedNode[],
-  folders:  PositionedNode[],
+  folders: PositionedNode[],
   allNodes: PositionedNode[],
 ): (n: PositionedNode) => Color {
   const extCounts = new Map<string, number>();
@@ -45,11 +45,16 @@ export function buildExtColorFn(
   // Bottom-up: average children's colors into each folder (deepest folders first)
   const childrenOf = buildChildrenMap(allNodes);
   const folderColorMap = new Map<string, Color>();
-  for (const folder of [...folders].sort((a, b) => b.path.split('/').length - a.path.split('/').length)) {
+  for (const folder of [...folders].sort(
+    (a, b) => b.path.split('/').length - a.path.split('/').length,
+  )) {
     const children = childrenOf.get(folder.path) ?? [];
-    if (!children.length) { folderColorMap.set(folder.path, DEFAULT_COLOR); continue; }
-    const colors = children.map(c =>
-      c.isFile ? fileColor(c.path) : (folderColorMap.get(c.path) ?? DEFAULT_COLOR)
+    if (!children.length) {
+      folderColorMap.set(folder.path, DEFAULT_COLOR);
+      continue;
+    }
+    const colors = children.map((c) =>
+      c.isFile ? fileColor(c.path) : (folderColorMap.get(c.path) ?? DEFAULT_COLOR),
     );
     folderColorMap.set(folder.path, averageColors(colors));
   }
@@ -65,10 +70,8 @@ export function buildExtColorFn(
 // Colors nodes by their depth in the hierarchy.
 // Hue rotates from warm (shallow) to cool (deep) at constant saturation/lightness,
 // so every level stays vivid with no muddy midpoints.
-export function buildDepthColorFn(
-  allNodes: PositionedNode[],
-): (n: PositionedNode) => Color {
-  const depths = allNodes.map(n => n.path === '' ? 0 : n.path.split('/').length);
+export function buildDepthColorFn(allNodes: PositionedNode[]): (n: PositionedNode) => Color {
+  const depths = allNodes.map((n) => (n.path === '' ? 0 : n.path.split('/').length));
   const maxDepth = Math.max(...depths, 1);
 
   return (n: PositionedNode): Color => {
@@ -87,10 +90,8 @@ const DEPTH_HUE_SHALLOW = 270; // violet at root, red at deepest
 
 // Colors nodes by byte size using rank-based mapping so the full rainbow is always
 // used regardless of size distribution. Folders use subtreeBytes; files use fileSize.
-export function buildFileSizeColorFn(
-  allNodes: PositionedNode[],
-): (n: PositionedNode) => Color {
-  const byteOf = (n: PositionedNode) => n.isFile ? (n.fileSize ?? 0) : n.subtreeBytes;
+export function buildFileSizeColorFn(allNodes: PositionedNode[]): (n: PositionedNode) => Color {
+  const byteOf = (n: PositionedNode) => (n.isFile ? (n.fileSize ?? 0) : n.subtreeBytes);
   const sorted = [...allNodes].sort((a, b) => byteOf(a) - byteOf(b));
   const rankMap = new Map<PositionedNode, number>();
   const last = sorted.length - 1;
@@ -111,9 +112,9 @@ export function buildFileSizeColorFn(
 // Saturation and lightness are fixed so every output color is equally vivid.
 export function lerpHue(hueA: number, hueB: number, t: number): number {
   let diff = hueB - hueA;
-  if (diff > 180)  diff -= 360;
+  if (diff > 180) diff -= 360;
   if (diff < -180) diff += 360;
-  return ((hueA + diff * t) % 360 + 360) % 360;
+  return (((hueA + diff * t) % 360) + 360) % 360;
 }
 
 export function hueColor(hue: number, saturation = 85, lightness = 65): Color {
@@ -122,17 +123,19 @@ export function hueColor(hue: number, saturation = 85, lightness = 65): Color {
 
 // Linear RGB interpolation — used for folder color averaging in extension mode.
 export function lerpColor(a: Color, b: Color, t: number): Color {
-  return new Color(
-    a.r + (b.r - a.r) * t,
-    a.g + (b.g - a.g) * t,
-    a.b + (b.b - a.b) * t,
-  );
+  return new Color(a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t);
 }
 
 export function averageColors(colors: Color[]): Color {
   if (!colors.length) return DEFAULT_COLOR;
-  let r = 0, g = 0, bl = 0;
-  for (const c of colors) { r += c.r; g += c.g; bl += c.b; }
+  let r = 0,
+    g = 0,
+    bl = 0;
+  for (const c of colors) {
+    r += c.r;
+    g += c.g;
+    bl += c.b;
+  }
   return new Color(r / colors.length, g / colors.length, bl / colors.length);
 }
 

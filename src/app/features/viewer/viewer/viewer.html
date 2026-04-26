@@ -1,7 +1,16 @@
 <div class="viewer-shell">
-
   <div class="canvas-area">
-    <app-three-canvas class="canvas" [result]="result()" [resetCamera]="resetCamera" [display]="display" [cameraParam]="cameraParam" [autoOrbit]="autoOrbit" (extColorsChange)="extColors = $event" (cameraChange)="onCameraChange($event)" (autoOrbitChange)="autoOrbit = $event" />
+    <app-three-canvas
+      class="canvas"
+      [result]="result()"
+      [resetCamera]="resetCamera"
+      [display]="display"
+      [cameraParam]="cameraParam"
+      [autoOrbit]="autoOrbit"
+      (extColorsChange)="extColors = $event"
+      (cameraChange)="onCameraChange($event)"
+      (autoOrbitChange)="autoOrbit = $event"
+    />
   </div>
 
   <aside class="sidebar">
@@ -28,5 +37,4 @@
   @if (error()) {
     <div class="error-toast">{{ error() }}</div>
   }
-
 </div>

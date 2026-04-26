@@ -5,8 +5,8 @@
 export interface TreeStructure {
   path: string;
   isFile: boolean;
-  fileSize?: number;       // bytes, files only
-  subtreeBytes: number;    // total bytes under this node (folders) or file size (files)
+  fileSize?: number; // bytes, files only
+  subtreeBytes: number; // total bytes under this node (folders) or file size (files)
   children: TreeStructure[];
 }
 
@@ -18,7 +18,7 @@ export interface PositionedNode {
   path: string;
   isFile: boolean;
   fileSize?: number;
-  subtreeBytes: number;    // total bytes under this node — pre-computed for renderer
+  subtreeBytes: number; // total bytes under this node — pre-computed for renderer
   x: number;
   y: number;
   z: number;

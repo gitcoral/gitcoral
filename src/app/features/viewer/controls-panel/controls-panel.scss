@@ -1,5 +1,5 @@
-$border:   rgba(80, 90, 110, 0.4);
-$text:     #c8d0e0;
+$border: rgba(80, 90, 110, 0.4);
+$text: #c8d0e0;
 $text-dim: #8899aa;
 
 @mixin icon-btn-sm {
@@ -18,7 +18,9 @@ $text-dim: #8899aa;
     line-height: 16px;
   }
 
-  &:hover { color: $text; }
+  &:hover {
+    color: $text;
+  }
 }
 
 @mixin text-input {
@@ -30,11 +32,17 @@ $text-dim: #8899aa;
   padding: 8px 10px;
   outline: none;
 
-  &::placeholder { color: $text-dim; }
-  &:focus { border-color: rgba(120, 140, 170, 0.6); }
+  &::placeholder {
+    color: $text-dim;
+  }
+  &:focus {
+    border-color: rgba(120, 140, 170, 0.6);
+  }
 }
 
-:host { display: block; }
+:host {
+  display: block;
+}
 
 :host.no-transitions * {
   transition: none !important;
@@ -51,7 +59,9 @@ $text-dim: #8899aa;
   overflow: hidden;
   transition: width 0.2s ease;
 
-  &.collapsed { width: 36px; }
+  &.collapsed {
+    width: 36px;
+  }
 }
 
 .panel-header {
@@ -82,7 +92,9 @@ $text-dim: #8899aa;
   cursor: pointer;
   border-radius: 4px;
 
-  &:hover { color: #fff; }
+  &:hover {
+    color: #fff;
+  }
 }
 
 .panel-favicon {
@@ -94,7 +106,9 @@ $text-dim: #8899aa;
 .collapse-btn {
   color: $text-dim;
   flex-shrink: 0;
-  &:hover { color: $text; }
+  &:hover {
+    color: $text;
+  }
 }
 
 .panel-body {
@@ -113,9 +127,15 @@ $text-dim: #8899aa;
   gap: 6px;
   padding: 8px 0;
 
-  &:first-child { padding-top: 4px; }
-  &:last-child  { padding-bottom: 0; }
-  & + &         { border-top: 1px solid $border; }
+  &:first-child {
+    padding-top: 4px;
+  }
+  &:last-child {
+    padding-bottom: 0;
+  }
+  & + & {
+    border-top: 1px solid $border;
+  }
 }
 
 .section-label {
@@ -132,7 +152,9 @@ $text-dim: #8899aa;
 
   &--toggle {
     cursor: pointer;
-    &:hover { color: $text; }
+    &:hover {
+      color: $text;
+    }
   }
 }
 
@@ -150,13 +172,19 @@ $text-dim: #8899aa;
   line-height: 14px;
   transition: transform 0.2s ease;
 
-  &--open { transform: rotate(90deg); }
+  &--open {
+    transform: rotate(90deg);
+  }
 }
 
-.render-btn { width: 100%; }
+.render-btn {
+  width: 100%;
+}
 
 .label-btn,
-.reset-btn  { @include icon-btn-sm; }
+.reset-btn {
+  @include icon-btn-sm;
+}
 
 .label-btn--active {
   color: $text !important;
@@ -182,7 +210,9 @@ $text-dim: #8899aa;
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 // Sliders
@@ -215,7 +245,9 @@ $text-dim: #8899aa;
   font-variant-numeric: tabular-nums;
 }
 
-mat-slider { margin: 0 12px; }
+mat-slider {
+  margin: 0 12px;
+}
 
 .repo-input {
   @include text-input;
@@ -245,8 +277,15 @@ mat-slider { margin: 0 12px; }
   align-items: center;
   flex-shrink: 0;
 
-  mat-icon { font-size: 16px; width: 16px; height: 16px; line-height: 16px; }
-  &:hover { color: $text; }
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    line-height: 16px;
+  }
+  &:hover {
+    color: $text;
+  }
 }
 
 // Extensions chip filter
@@ -272,7 +311,10 @@ mat-slider { margin: 0 12px; }
   line-height: 1.4;
   touch-action: manipulation;
 
-  &:hover { color: $text; border-color: rgba(120, 140, 170, 0.6); }
+  &:hover {
+    color: $text;
+    border-color: rgba(120, 140, 170, 0.6);
+  }
 }
 
 .ext-chips {
@@ -297,7 +339,9 @@ mat-slider { margin: 0 12px; }
   line-height: 1.4;
   touch-action: manipulation;
 
-  &:hover { background: rgba(255, 255, 255, 0.1); }
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
 
   &.ext-chip--hidden {
     opacity: 0.35;
@@ -326,7 +370,9 @@ mat-slider { margin: 0 12px; }
   line-height: 1.4;
   touch-action: manipulation;
 
-  &:hover { color: $text; }
+  &:hover {
+    color: $text;
+  }
 }
 
 .ext-count {
@@ -334,7 +380,9 @@ mat-slider { margin: 0 12px; }
   color: $text-dim;
   margin-left: 2px;
 
-  .ext-chip--hidden & { opacity: 0.6; }
+  .ext-chip--hidden & {
+    opacity: 0.6;
+  }
 }
 
 .color-mode-row {
@@ -359,7 +407,10 @@ mat-slider { margin: 0 12px; }
   line-height: 1.4;
   touch-action: manipulation;
 
-  &:hover { color: $text; border-color: rgba(120, 140, 170, 0.6); }
+  &:hover {
+    color: $text;
+    border-color: rgba(120, 140, 170, 0.6);
+  }
 
   &--active {
     color: $text;
@@ -384,7 +435,9 @@ mat-slider { margin: 0 12px; }
   cursor: pointer;
   color: $text;
   text-align: left;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 
   &:hover {
     background: rgba(255, 255, 255, 0.08);
@@ -431,7 +484,9 @@ mat-slider { margin: 0 12px; }
   color: $text-dim;
   text-decoration: none;
 
-  &:hover { color: $text; }
+  &:hover {
+    color: $text;
+  }
 }
 
 .footer-github-icon {

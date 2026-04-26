@@ -18,7 +18,7 @@ describe('simulate', () => {
     const result = simulate([1, 2, 3, 5, 8], 2, 1.5);
     for (const [theta] of result) {
       expect(theta).toBeGreaterThanOrEqual(1e-6);
-      expect(theta).toBeLessThanOrEqual(Math.PI * 5 / 12);
+      expect(theta).toBeLessThanOrEqual((Math.PI * 5) / 12);
     }
   });
 

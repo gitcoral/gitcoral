@@ -14,9 +14,9 @@
 
 - [ ] **og:image / social card** — use the snapshot feature to capture a good-looking visualization and use it as the static social preview image
 
-- [ ] **Landing / empty state** — when the user lands on `/` with no repo, show a short hero ("3D visualization of any GitHub repo") and a few clickable example repos (e.g. `facebook/react`, `torvalds/linux`, `angular/angular`) to reduce friction and demonstrate the app immediately
+- [x] **Landing / empty state** — example repo cards shown on `/`, Filter/Display/Layout hidden until a repo is loaded; logo navigates home
 
-- [ ] **Analytics** — add Plausible or Google Analytics to measure traffic and conversion
+- [x] **Analytics** — Cloudflare Web Analytics enabled via Automatic setup (server-side, no JS snippet needed)
 
 - [x] **"Star on GitHub" button** — decided against it; footer GitHub link is sufficient
 
@@ -24,11 +24,10 @@
 
 - [x] **Mobile responsiveness** — tested on iPhone 14 Pro, looks good as-is
 
-- [ ] **Example repos in empty state** — even without a full landing page, clickable examples on the empty input state let visitors see the app in action in one click
+- [x] **Example repos in empty state** — done as part of landing/empty state above
 
 ## P3 — Polish
 
 - [x] **Remove Angular boilerplate** from `src/app/app.html` (placeholder "Hello Angular" template content)
 
 - [x] **Bump version** — `package.json` is at `0.0.0`
-

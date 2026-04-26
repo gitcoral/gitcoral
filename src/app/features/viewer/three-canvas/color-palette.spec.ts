@@ -20,7 +20,16 @@ import { PositionedNode } from '../../../shared/models/tree-node.model';
 // ---------------------------------------------------------------------------
 
 function node(path: string, isFile: boolean, fileSize = 0, subtreeBytes = 0): PositionedNode {
-  return { path, isFile, fileSize: isFile ? fileSize : undefined, subtreeBytes, x: 0, y: 0, z: 0, connectionWidth: 0 };
+  return {
+    path,
+    isFile,
+    fileSize: isFile ? fileSize : undefined,
+    subtreeBytes,
+    x: 0,
+    y: 0,
+    z: 0,
+    connectionWidth: 0,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -148,19 +157,13 @@ describe('averageColors', () => {
 
 describe('buildChildrenMap', () => {
   it('maps root children correctly', () => {
-    const nodes = [
-      node('src', false),
-      node('readme.md', true),
-    ];
+    const nodes = [node('src', false), node('readme.md', true)];
     const map = buildChildrenMap(nodes);
     expect(map.get('')).toHaveLength(2);
   });
 
   it('maps nested children correctly', () => {
-    const nodes = [
-      node('src/a.ts', true),
-      node('src/b.ts', true),
-    ];
+    const nodes = [node('src/a.ts', true), node('src/b.ts', true)];
     const map = buildChildrenMap(nodes);
     expect(map.get('src')).toHaveLength(2);
   });
@@ -180,15 +183,26 @@ describe('buildExtColorMap', () => {
   });
 
   it('assigns a Color to each extension', () => {
-    const map = buildExtColorMap(new Map([['ts', 10], ['js', 5]]));
+    const map = buildExtColorMap(
+      new Map([
+        ['ts', 10],
+        ['js', 5],
+      ]),
+    );
     expect(map.has('ts')).toBe(true);
     expect(map.has('js')).toBe(true);
     expect(map.get('ts')).toBeInstanceOf(Color);
   });
 
   it('assigns distinct colors to different extensions', () => {
-    const map = buildExtColorMap(new Map([['ts', 10], ['js', 5], ['css', 3]]));
-    const colors = [...map.values()].map(c => `${c.r},${c.g},${c.b}`);
+    const map = buildExtColorMap(
+      new Map([
+        ['ts', 10],
+        ['js', 5],
+        ['css', 3],
+      ]),
+    );
+    const colors = [...map.values()].map((c) => `${c.r},${c.g},${c.b}`);
     const unique = new Set(colors);
     expect(unique.size).toBe(3);
   });
@@ -224,11 +238,11 @@ describe('buildExtColorFn', () => {
   });
 
   it('returns different colors for files with different extensions', () => {
-    const ts  = node('a.ts',  true, 10, 10);
+    const ts = node('a.ts', true, 10, 10);
     const css = node('b.css', true, 10, 10);
-    const fn  = buildExtColorFn([ts, css], [], [ts, css]);
-    const ct  = fn(ts);
-    const cc  = fn(css);
+    const fn = buildExtColorFn([ts, css], [], [ts, css]);
+    const ct = fn(ts);
+    const cc = fn(css);
     expect(ct.r === cc.r && ct.g === cc.g && ct.b === cc.b).toBe(false);
   });
 });
@@ -245,7 +259,7 @@ describe('buildDepthColorFn', () => {
   it('root node gets violet (high blue channel)', () => {
     const root = node('', false, 0, 100);
     const deep = node('a/b/c', false, 0, 10);
-    const fn   = buildDepthColorFn([root, deep]);
+    const fn = buildDepthColorFn([root, deep]);
     const color = fn(root);
     // t=0 → hue 270 (violet): blue dominates
     expect(color.b).toBeGreaterThan(color.r);
@@ -254,25 +268,21 @@ describe('buildDepthColorFn', () => {
   it('deepest node gets red (high red channel)', () => {
     const root = node('', false, 0, 100);
     const deep = node('a/b/c', false, 0, 10);
-    const fn   = buildDepthColorFn([root, deep]);
+    const fn = buildDepthColorFn([root, deep]);
     const color = fn(deep);
     // t=1 → hue 0 (red): red dominates
     expect(color.r).toBeGreaterThan(color.b);
   });
 
   it('mid-depth node has a different color from both extremes', () => {
-    const nodes = [
-      node('', false, 0, 0),
-      node('a', false, 0, 0),
-      node('a/b', false, 0, 0),
-    ];
-    const fn      = buildDepthColorFn(nodes);
+    const nodes = [node('', false, 0, 0), node('a', false, 0, 0), node('a/b', false, 0, 0)];
+    const fn = buildDepthColorFn(nodes);
     const shallow = fn(nodes[0]);
-    const mid     = fn(nodes[1]);
-    const deep    = fn(nodes[2]);
+    const mid = fn(nodes[1]);
+    const deep = fn(nodes[2]);
     // Mid should differ from both ends
     expect(mid.r === shallow.r && mid.g === shallow.g && mid.b === shallow.b).toBe(false);
-    expect(mid.r === deep.r    && mid.g === deep.g    && mid.b === deep.b).toBe(false);
+    expect(mid.r === deep.r && mid.g === deep.g && mid.b === deep.b).toBe(false);
   });
 });
 
@@ -288,7 +298,7 @@ describe('buildFileSizeColorFn', () => {
   it('zero-size file gets violet (high blue channel)', () => {
     const small = node('a.ts', true, 0, 0);
     const large = node('b.ts', true, 1_000_000, 1_000_000);
-    const fn    = buildFileSizeColorFn([small, large]);
+    const fn = buildFileSizeColorFn([small, large]);
     const color = fn(small);
     // t=0 → hue 270 (violet): blue dominates
     expect(color.b).toBeGreaterThan(color.r);
@@ -297,7 +307,7 @@ describe('buildFileSizeColorFn', () => {
   it('largest file gets red (high red channel)', () => {
     const small = node('a.ts', true, 0, 0);
     const large = node('b.ts', true, 1_000_000, 1_000_000);
-    const fn    = buildFileSizeColorFn([small, large]);
+    const fn = buildFileSizeColorFn([small, large]);
     const color = fn(large);
     // t=1 → hue 0 (red): red dominates
     expect(color.r).toBeGreaterThan(color.b);
@@ -305,16 +315,16 @@ describe('buildFileSizeColorFn', () => {
 
   it('uses subtreeBytes for folders', () => {
     const folder = node('src', false, 0, 500_000);
-    const fn     = buildFileSizeColorFn([folder]);
+    const fn = buildFileSizeColorFn([folder]);
     // Should not throw and should return a Color
     expect(fn(folder)).toBeInstanceOf(Color);
   });
 
   it('mid-size file has a different color from both extremes', () => {
-    const small = node('a.ts', true, 0,         0);
-    const mid   = node('b.ts', true, 1_000,     1_000);
+    const small = node('a.ts', true, 0, 0);
+    const mid = node('b.ts', true, 1_000, 1_000);
     const large = node('c.ts', true, 1_000_000, 1_000_000);
-    const fn    = buildFileSizeColorFn([small, mid, large]);
+    const fn = buildFileSizeColorFn([small, mid, large]);
     const cs = fn(small);
     const cm = fn(mid);
     const cl = fn(large);

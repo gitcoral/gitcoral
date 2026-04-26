@@ -5,25 +5,25 @@ export function simulate(weights: number[], buoy: number, repel: number): Array<
   if (N === 0) return [];
   if (N === 1) return [[0.0, 0.0]];
 
-  const maxW = weights.reduce((m, v) => v > m ? v : m, 0);
+  const maxW = weights.reduce((m, v) => (v > m ? v : m), 0);
   const thetas = new Float64Array(N).fill(Math.PI / 3);
-  const phis   = Float64Array.from({ length: N }, (_, i) => i * 2 * Math.PI / N);
+  const phis = Float64Array.from({ length: N }, (_, i) => (i * 2 * Math.PI) / N);
 
   // Pre-allocate reusable buffers — no per-step heap allocation
-  const px  = new Float64Array(N);
-  const py  = new Float64Array(N);
-  const pz  = new Float64Array(N);
-  const dt  = new Float64Array(N);
-  const dp  = new Float64Array(N);
-  const sq  = new Float64Array(N); // sqrt(w/maxW) per node
+  const px = new Float64Array(N);
+  const py = new Float64Array(N);
+  const pz = new Float64Array(N);
+  const dt = new Float64Array(N);
+  const dp = new Float64Array(N);
+  const sq = new Float64Array(N); // sqrt(w/maxW) per node
   for (let i = 0; i < N; i++) sq[i] = Math.sqrt(weights[i] / maxW);
 
-  const LR           = 0.05;
-  const MAX_STEPS    = 200;
+  const LR = 0.05;
+  const MAX_STEPS = 200;
   const CONVERGE_EPS = 1e-4; // early exit when forces are negligible
 
   for (let step = 0; step < MAX_STEPS; step++) {
-    const lr = LR * (1 - 0.5 * step / MAX_STEPS);
+    const lr = LR * (1 - (0.5 * step) / MAX_STEPS);
 
     // Update positions in flat typed arrays
     for (let i = 0; i < N; i++) {
@@ -38,15 +38,18 @@ export function simulate(weights: number[], buoy: number, repel: number): Array<
 
     let maxForce = 0;
     for (let i = 0; i < N; i++) {
-      const t   = thetas[i];
-      const p   = phis[i];
-      const ct  = Math.cos(t);
-      const st  = Math.sin(t);
-      const cp  = Math.cos(p);
-      const sp  = Math.sin(p);
+      const t = thetas[i];
+      const p = phis[i];
+      const ct = Math.cos(t);
+      const st = Math.sin(t);
+      const cp = Math.cos(p);
+      const sp = Math.sin(p);
       // Tangent basis
-      const etx =  ct * cp;  const ety =  ct * sp;  const etz = -st;
-      const epx = -sp;        const epy =  cp;
+      const etx = ct * cp;
+      const ety = ct * sp;
+      const etz = -st;
+      const epx = -sp;
+      const epy = cp;
 
       // Buoyancy
       dt[i] -= buoy * sq[i];
@@ -59,7 +62,7 @@ export function simulate(weights: number[], buoy: number, repel: number): Array<
         const dy = py[i] - py[j];
         const dz = pz[i] - pz[j];
         const d2 = Math.max(dx * dx + dy * dy + dz * dz, 0.01);
-        const s  = repel * qi * sq[j] / d2;
+        const s = (repel * qi * sq[j]) / d2;
         dt[i] += s * (dx * etx + dy * ety + dz * etz);
         dp[i] += s * (dx * epx + dy * epy);
       }
@@ -67,8 +70,8 @@ export function simulate(weights: number[], buoy: number, repel: number): Array<
     }
 
     for (let i = 0; i < N; i++) {
-      thetas[i] = Math.max(1e-6, Math.min(Math.PI * 5 / 12, thetas[i] + lr * dt[i]));
-      phis[i]   = ((phis[i] + lr * dp[i]) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+      thetas[i] = Math.max(1e-6, Math.min((Math.PI * 5) / 12, thetas[i] + lr * dt[i]));
+      phis[i] = (((phis[i] + lr * dp[i]) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
     }
 
     if (maxForce * lr < CONVERGE_EPS) break; // converged early

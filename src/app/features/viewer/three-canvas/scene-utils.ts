@@ -17,12 +17,16 @@ export function parentPath(path: string): string {
   return i >= 0 ? path.substring(0, i) : '';
 }
 
-export function makeCbrtNormalizer(values: number[], outMin: number, outMax: number): (v: number) => number {
-  const cbrtValues = values.map(v => Math.cbrt(v));
-  const min   = Math.min(...cbrtValues, 0);
-  const max   = Math.max(...cbrtValues, 1);
+export function makeCbrtNormalizer(
+  values: number[],
+  outMin: number,
+  outMax: number,
+): (v: number) => number {
+  const cbrtValues = values.map((v) => Math.cbrt(v));
+  const min = Math.min(...cbrtValues, 0);
+  const max = Math.max(...cbrtValues, 1);
   const range = max - min || 1;
-  return (v: number) => outMin + (outMax - outMin) * (Math.cbrt(v) - min) / range;
+  return (v: number) => outMin + ((outMax - outMin) * (Math.cbrt(v) - min)) / range;
 }
 
 // Returns the set of paths that should remain fully visible when focusPath is selected:

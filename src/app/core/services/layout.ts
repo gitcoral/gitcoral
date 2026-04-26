@@ -17,30 +17,27 @@ interface PendingRequest {
 
 @Injectable({ providedIn: 'root' })
 export class LayoutService implements OnDestroy {
-
   private readonly DEBOUNCE_MS = 500;
 
   private worker: Worker | null = null;
   private request$ = new Subject<PendingRequest>();
-  private destroy$  = new Subject<void>();
+  private destroy$ = new Subject<void>();
 
   /** Signal — components read this reactively, change detection fires automatically */
-  readonly result  = signal<LayoutResult | null>(null);
-  readonly error   = signal<string | null>(null);
+  readonly result = signal<LayoutResult | null>(null);
+  readonly error = signal<string | null>(null);
   readonly loading = signal(false);
 
   constructor() {
     if (typeof Worker !== 'undefined') {
-      this.worker = new Worker(
-        new URL('../workers/layout.worker', import.meta.url),
-        { type: 'module' },
-      );
+      this.worker = new Worker(new URL('../workers/layout.worker', import.meta.url), {
+        type: 'module',
+      });
     }
 
-    this.request$.pipe(
-      debounceTime(this.DEBOUNCE_MS),
-      takeUntil(this.destroy$),
-    ).subscribe(req => this.runWorker(req));
+    this.request$
+      .pipe(debounceTime(this.DEBOUNCE_MS), takeUntil(this.destroy$))
+      .subscribe((req) => this.runWorker(req));
   }
 
   schedule(root: TreeStructure, params: LayoutParams = DEFAULT_LAYOUT_PARAMS, repoName = ''): void {
@@ -67,7 +64,7 @@ export class LayoutService implements OnDestroy {
 
     const onMessage = ({ data }: MessageEvent<WorkerResponse>) => {
       this.worker!.removeEventListener('message', onMessage);
-      this.worker!.removeEventListener('error',   onError);
+      this.worker!.removeEventListener('error', onError);
       if (data.error) {
         this.error.set(data.error);
       } else {
@@ -78,13 +75,17 @@ export class LayoutService implements OnDestroy {
 
     const onError = (err: ErrorEvent) => {
       this.worker!.removeEventListener('message', onMessage);
-      this.worker!.removeEventListener('error',   onError);
+      this.worker!.removeEventListener('error', onError);
       this.error.set(err.message);
       this.loading.set(false);
     };
 
     this.worker.addEventListener('message', onMessage);
-    this.worker.addEventListener('error',   onError);
-    this.worker.postMessage({ root: req.root, params: req.params, repoName: req.repoName } as WorkerRequest);
+    this.worker.addEventListener('error', onError);
+    this.worker.postMessage({
+      root: req.root,
+      params: req.params,
+      repoName: req.repoName,
+    } as WorkerRequest);
   }
 }

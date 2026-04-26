@@ -7,9 +7,16 @@ interface GithubEntry {
   size?: number;
 }
 
-interface GithubRepoMeta   { default_branch: string }
-interface GithubCommit     { commit: { tree: { sha: string } } }
-interface GithubTreeResult { tree: GithubEntry[]; truncated: boolean }
+interface GithubRepoMeta {
+  default_branch: string;
+}
+interface GithubCommit {
+  commit: { tree: { sha: string } };
+}
+interface GithubTreeResult {
+  tree: GithubEntry[];
+  truncated: boolean;
+}
 
 interface InternalNode {
   path: string;
@@ -21,10 +28,9 @@ interface InternalNode {
 
 @Injectable({ providedIn: 'root' })
 export class GithubService {
-
   private readonly BASE = 'https://api.github.com';
   private readonly HEADERS: Record<string, string> = {
-    'Accept': 'application/vnd.github+json',
+    Accept: 'application/vnd.github+json',
     'User-Agent': 'gitcoral',
   };
 
@@ -55,11 +61,11 @@ export class GithubService {
       : { ...this.HEADERS };
 
     // Step 1: get default branch
-    const meta   = await this.get<GithubRepoMeta>(`${this.BASE}/repos/${owner}/${repo}`, headers);
+    const meta = await this.get<GithubRepoMeta>(`${this.BASE}/repos/${owner}/${repo}`, headers);
     const branch = meta.default_branch ?? 'main';
 
     // Step 2: get HEAD commit tree SHA
-    const commit  = await this.get<GithubCommit>(
+    const commit = await this.get<GithubCommit>(
       `${this.BASE}/repos/${owner}/${repo}/commits/${encodeURIComponent(branch)}`,
       headers,
     );
@@ -109,14 +115,20 @@ export class GithubService {
 
   private friendlyError(status: number): string {
     switch (status) {
-      case 401: return 'Access denied. The request was not authorized.';
-      case 403: return 'GitHub rate limit reached. Please wait a moment and try again.';
-      case 404: return 'Repository not found. Check the URL and make sure it is public.';
-      case 422: return 'Repository is too large to load.';
+      case 401:
+        return 'Access denied. The request was not authorized.';
+      case 403:
+        return 'GitHub rate limit reached. Please wait a moment and try again.';
+      case 404:
+        return 'Repository not found. Check the URL and make sure it is public.';
+      case 422:
+        return 'Repository is too large to load.';
       case 500:
       case 502:
-      case 503: return 'GitHub is having issues. Please try again later.';
-      default:  return `Something went wrong (HTTP ${status}). Please try again.`;
+      case 503:
+        return 'GitHub is having issues. Please try again later.';
+      default:
+        return `Something went wrong (HTTP ${status}). Please try again.`;
     }
   }
 
@@ -124,12 +136,7 @@ export class GithubService {
     return { path, isFile, fileSize, children: new Map(), subtreeBytes: 0 };
   }
 
-  private ensurePath(
-    root: InternalNode,
-    relPath: string,
-    isFile: boolean,
-    fileSize: number,
-  ): void {
+  private ensurePath(root: InternalNode, relPath: string, isFile: boolean, fileSize: number): void {
     const parts = relPath.split('/').filter(Boolean);
     let cur = root;
     for (let i = 0; i < parts.length; i++) {
@@ -187,7 +194,7 @@ export class GithubService {
         isFile: n.isFile,
         fileSize: n.isFile ? n.fileSize : undefined,
         subtreeBytes: n.subtreeBytes,
-        children: [...n.children.values()].map(c => built.get(c)!),
+        children: [...n.children.values()].map((c) => built.get(c)!),
       });
     }
     return built.get(root)!;

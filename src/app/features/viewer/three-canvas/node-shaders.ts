@@ -1,7 +1,7 @@
 // Vertex and fragment shaders for circular points with per-vertex size and colour.
 // Folders render as flat 2D rings; files render as sphere impostors.
 
-export const VERT = /* glsl */`
+export const VERT = /* glsl */ `
   attribute float aSize;
   attribute vec3  aColor;
   attribute float aIsFolder;
@@ -18,7 +18,7 @@ export const VERT = /* glsl */`
   }
 `;
 
-export const FRAG = /* glsl */`
+export const FRAG = /* glsl */ `
   uniform float uOpacity;
   varying vec3  vColor;
   varying float vIsFolder;

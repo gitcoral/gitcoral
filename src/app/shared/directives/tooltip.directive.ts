@@ -1,14 +1,21 @@
-import { Directive, ElementRef, HostListener, Input, OnDestroy, Renderer2, inject } from '@angular/core';
+import {
+  Directive,
+  ElementRef,
+  HostListener,
+  Input,
+  OnDestroy,
+  Renderer2,
+  inject,
+} from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 
 @Directive({
   selector: '[appTooltip]',
 })
 export class TooltipDirective implements OnDestroy {
-
   @Input('appTooltip') text = '';
 
-  private el       = inject(ElementRef);
+  private el = inject(ElementRef);
   private renderer = inject(Renderer2);
   private document = inject(DOCUMENT);
 
@@ -26,13 +33,13 @@ export class TooltipDirective implements OnDestroy {
 
     this.rafId = requestAnimationFrame(() => {
       if (!this.tipEl) return;
-      const r        = this.el.nativeElement.getBoundingClientRect();
+      const r = this.el.nativeElement.getBoundingClientRect();
       const tipWidth = this.tipEl.offsetWidth;
       const viewport = this.document.documentElement.clientWidth;
       const centered = r.left + r.width / 2 - tipWidth / 2;
-      const left     = Math.max(8, Math.min(centered, viewport - tipWidth - 8));
+      const left = Math.max(8, Math.min(centered, viewport - tipWidth - 8));
       this.renderer.setStyle(this.tipEl, 'left', `${left}px`);
-      this.renderer.setStyle(this.tipEl, 'top',  `${r.bottom + 6}px`);
+      this.renderer.setStyle(this.tipEl, 'top', `${r.bottom + 6}px`);
       this.renderer.setStyle(this.tipEl, 'visibility', 'visible');
     });
   }

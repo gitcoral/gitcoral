@@ -1,4 +1,15 @@
-import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnDestroy, OnInit, Output, SimpleChanges, OnChanges } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  EventEmitter,
+  Input,
+  OnDestroy,
+  OnInit,
+  Output,
+  SimpleChanges,
+  OnChanges,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -6,7 +17,14 @@ import { MatSliderModule } from '@angular/material/slider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Subject, debounceTime, takeUntil } from 'rxjs';
-import { ColorMode, DEFAULT_DISPLAY_OPTIONS, DEFAULT_LAYOUT_PARAMS, DisplayOptions, LayoutParams, LoadingState } from '../../../shared/models/tree-node.model';
+import {
+  ColorMode,
+  DEFAULT_DISPLAY_OPTIONS,
+  DEFAULT_LAYOUT_PARAMS,
+  DisplayOptions,
+  LayoutParams,
+  LoadingState,
+} from '../../../shared/models/tree-node.model';
 import { GIT_HASH } from '../../../../git-hash';
 
 export interface RepoSubmitEvent {
@@ -27,7 +45,6 @@ export interface RepoSubmitEvent {
   styleUrl: './controls-panel.scss',
 })
 export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestroy {
-
   @Input() status: LoadingState = 'idle';
   @Input() initialRepo = '';
   @Input() initialQuery = '';
@@ -37,13 +54,13 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   @Input() maxDepth = 0;
   @Input() extColors: { ext: string; label: string; color: string; count: number }[] = [];
   @Input() autoOrbit = false;
-  @Output() repoSubmit      = new EventEmitter<RepoSubmitEvent>();
+  @Output() repoSubmit = new EventEmitter<RepoSubmitEvent>();
   @Output() autoOrbitToggle = new EventEmitter<void>();
-  @Output() paramsChange    = new EventEmitter<LayoutParams>();
-  @Output() displayChange   = new EventEmitter<DisplayOptions>();
+  @Output() paramsChange = new EventEmitter<LayoutParams>();
+  @Output() displayChange = new EventEmitter<DisplayOptions>();
   @Output() snapshotRequest = new EventEmitter<void>();
   @Output() cameraResetRequest = new EventEmitter<void>();
-  @Output() homeRequest     = new EventEmitter<void>();
+  @Output() homeRequest = new EventEmitter<void>();
 
   repoUrl = '';
   params: LayoutParams = { ...DEFAULT_LAYOUT_PARAMS };
@@ -58,8 +75,8 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   readonly gitHash = GIT_HASH;
 
   readonly examples = [
-    { repo: 'facebook/react',  image: '/examples/facebook-react.svg'  },
-    { repo: 'torvalds/linux',  image: '/examples/torvalds-linux.svg'  },
+    { repo: 'facebook/react', image: '/examples/facebook-react.svg' },
+    { repo: 'torvalds/linux', image: '/examples/torvalds-linux.svg' },
     { repo: 'angular/angular', image: '/examples/angular-angular.svg' },
   ];
 
@@ -68,8 +85,8 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   fileSizePosMax = 1000;
 
   readonly displayOptions: Array<{ key: keyof DisplayOptions; label: string }> = [
-    { key: 'showFiles',      label: 'Files'      },
-    { key: 'showFolders',    label: 'Folders'    },
+    { key: 'showFiles', label: 'Files' },
+    { key: 'showFolders', label: 'Folders' },
     { key: 'showConnectors', label: 'Connectors' },
   ];
 
@@ -81,15 +98,50 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
     step: number;
     tooltip: string;
   }> = [
-    { key: 'zScale',    label: 'Z scale',          min: 0.1,   max: 2.0,  step: 0.05,  tooltip: 'Vertical stretch of the hierarchy — higher values push layers further apart'      },
-    { key: 'buoyancy',  label: 'Buoyancy',          min: 0.1,   max: 6.0,  step: 0.1,   tooltip: 'Downward pull on folder nodes within their layer — increase to spread them out'   },
-    { key: 'repulsion', label: 'Repulsion',          min: 0.1,   max: 6.0,  step: 0.1,   tooltip: 'How strongly folders push each other apart — increase if nodes overlap'           },
-    { key: 'spread',    label: 'Spread',             min: 0.3,   max: 0.99, step: 0.01,  tooltip: 'How tightly child folders cluster within their parent sphere'                     },
-    { key: 'sphereD',   label: 'File sphere size',   min: 0.005, max: 0.1,  step: 0.005, tooltip: 'Radius of the point cloud of files orbiting each folder'                         },
+    {
+      key: 'zScale',
+      label: 'Z scale',
+      min: 0.1,
+      max: 2.0,
+      step: 0.05,
+      tooltip: 'Vertical stretch of the hierarchy — higher values push layers further apart',
+    },
+    {
+      key: 'buoyancy',
+      label: 'Buoyancy',
+      min: 0.1,
+      max: 6.0,
+      step: 0.1,
+      tooltip: 'Downward pull on folder nodes within their layer — increase to spread them out',
+    },
+    {
+      key: 'repulsion',
+      label: 'Repulsion',
+      min: 0.1,
+      max: 6.0,
+      step: 0.1,
+      tooltip: 'How strongly folders push each other apart — increase if nodes overlap',
+    },
+    {
+      key: 'spread',
+      label: 'Spread',
+      min: 0.3,
+      max: 0.99,
+      step: 0.01,
+      tooltip: 'How tightly child folders cluster within their parent sphere',
+    },
+    {
+      key: 'sphereD',
+      label: 'File sphere size',
+      min: 0.005,
+      max: 0.1,
+      step: 0.005,
+      tooltip: 'Radius of the point cloud of files orbiting each folder',
+    },
   ];
 
   private params$ = new Subject<LayoutParams>();
-  private query$  = new Subject<void>();
+  private query$ = new Subject<void>();
   private destroy$ = new Subject<void>();
 
   constructor(private el: ElementRef<HTMLElement>) {
@@ -103,7 +155,7 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   ngOnInit(): void {
     this.params$
       .pipe(debounceTime(500), takeUntil(this.destroy$))
-      .subscribe(p => this.paramsChange.emit(p));
+      .subscribe((p) => this.paramsChange.emit(p));
     this.query$
       .pipe(debounceTime(300), takeUntil(this.destroy$))
       .subscribe(() => this.displayChange.emit({ ...this.display }));
@@ -131,7 +183,11 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
       this.display.depthMax = this.maxDepth;
       this.displayChange.emit({ ...this.display });
     }
-    if (changes['repoName'] && !changes['repoName'].firstChange && changes['repoName'].previousValue) {
+    if (
+      changes['repoName'] &&
+      !changes['repoName'].firstChange &&
+      changes['repoName'].previousValue
+    ) {
       // User switched repos — reset hidden extensions, path query, and collapsed state
       this.display.hiddenExtensions = [];
       this.display.pathQuery = '';
@@ -155,7 +211,7 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   toggleExtension(ext: string): void {
     const hidden = this.display.hiddenExtensions;
     this.display.hiddenExtensions = hidden.includes(ext)
-      ? hidden.filter(e => e !== ext)
+      ? hidden.filter((e) => e !== ext)
       : [...hidden, ext];
     this.displayChange.emit({ ...this.display });
   }
@@ -166,7 +222,7 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   }
 
   selectNoneExtensions(): void {
-    this.display.hiddenExtensions = this.extColors.map(e => e.ext);
+    this.display.hiddenExtensions = this.extColors.map((e) => e.ext);
     this.displayChange.emit({ ...this.display });
   }
 
@@ -242,7 +298,7 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   onCopyLink(): void {
     navigator.clipboard.writeText(window.location.href).then(() => {
       this.linkCopied = true;
-      setTimeout(() => this.linkCopied = false, 2000);
+      setTimeout(() => (this.linkCopied = false), 2000);
     });
   }
 
@@ -272,20 +328,20 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
 
   formatCount(n: number): string {
     if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
-    if (n >= 1_000)     return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
+    if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
     return String(n);
   }
 
   formatBytes(b: number): string {
     if (b >= 1_000_000) return (b / 1_000_000).toFixed(1).replace(/\.0$/, '') + ' MB';
-    if (b >= 1_000)     return (b / 1_000).toFixed(1).replace(/\.0$/, '') + ' KB';
+    if (b >= 1_000) return (b / 1_000).toFixed(1).replace(/\.0$/, '') + ' KB';
     return b + ' B';
   }
 
   private posToBytes(pos: number): number {
     if (pos <= 0) return 0;
     if (pos >= 1000) return this.maxFileSize;
-    return Math.round(Math.exp(pos / 1000 * Math.log(this.maxFileSize + 1)) - 1);
+    return Math.round(Math.exp((pos / 1000) * Math.log(this.maxFileSize + 1)) - 1);
   }
 
   toggleCollapse(): void {

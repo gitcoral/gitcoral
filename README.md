@@ -37,6 +37,7 @@ Enter any public repo URL, hit **Render**, and in seconds you get an interactive
 ## Features
 
 ### Visualization
+
 - **3D point cloud** rendered with WebGL via Three.js — folders as spheres, files as orbiting dots
 - **Hierarchy layers** — depth encoded on the vertical axis so structure is immediately readable
 - **Connectors** — animated lines linking parent folders to their children
@@ -44,34 +45,39 @@ Enter any public repo URL, hit **Render**, and in seconds you get an interactive
 - **Auto-orbit** — one-click continuous rotation; grabbing the canvas stops it instantly
 
 ### Color Modes
-| Mode | Description |
-|------|-------------|
-| **By type** | Each file extension gets a unique color — spot your `.ts`, `.py`, `.md` at a glance |
-| **By size** | Hotter = larger file; instantly find the heavy files |
-| **By depth** | Color encodes how deep in the tree a node lives |
+
+| Mode         | Description                                                                         |
+| ------------ | ----------------------------------------------------------------------------------- |
+| **By type**  | Each file extension gets a unique color — spot your `.ts`, `.py`, `.md` at a glance |
+| **By size**  | Hotter = larger file; instantly find the heavy files                                |
+| **By depth** | Color encodes how deep in the tree a node lives                                     |
 
 ### Filtering & Search
+
 - **Path search** — type a fragment to highlight matching files and dim everything else
 - **Extension toggle** — show or hide specific file types with one click
 - **File size range** — log-scale slider to focus on files within a size band
 - **Depth range** — peel away deep layers to focus on top-level structure
 
 ### Layout Controls
+
 Fine-tune the physics of the 3D layout with live sliders:
 
-| Slider | Effect |
-|--------|--------|
-| **Z scale** | Vertical stretch — push layers further apart |
-| **Buoyancy** | Downward pull on folder nodes within a layer |
-| **Repulsion** | How strongly folders push each other apart |
-| **Spread** | How tightly child folders cluster inside their parent |
-| **File sphere size** | Radius of the file point cloud around each folder |
+| Slider               | Effect                                                |
+| -------------------- | ----------------------------------------------------- |
+| **Z scale**          | Vertical stretch — push layers further apart          |
+| **Buoyancy**         | Downward pull on folder nodes within a layer          |
+| **Repulsion**        | How strongly folders push each other apart            |
+| **Spread**           | How tightly child folders cluster inside their parent |
+| **File sphere size** | Radius of the file point cloud around each folder     |
 
 ### Sharing & Export
+
 - **Shareable URLs** — camera position, color mode, and search query are encoded in the URL; copy and share to show exactly what you see
 - **PNG snapshot** — download a high-resolution screenshot of the current view with one click
 
 ### Notes
+
 - Supports `github.com/owner/repo`, SSH URLs, and short `owner/repo` form
 - Layout computation runs in a **Web Worker** — the UI stays responsive while big repos are processed
 - No authentication needed for public repositories — unauthenticated GitHub API requests are rate-limited to 60/hour per IP; if you hit the limit, wait a minute and try again

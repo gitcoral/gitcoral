@@ -10,7 +10,12 @@ import {
   SimpleChanges,
   ViewChild,
 } from '@angular/core';
-import { DEFAULT_DISPLAY_OPTIONS, DisplayOptions, LayoutResult, PositionedNode } from '../../../shared/models/tree-node.model';
+import {
+  DEFAULT_DISPLAY_OPTIONS,
+  DisplayOptions,
+  LayoutResult,
+  PositionedNode,
+} from '../../../shared/models/tree-node.model';
 import {
   BufferAttribute,
   BufferGeometry,
@@ -31,16 +36,23 @@ import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { VERT, FRAG } from './node-shaders';
-import { DEFAULT_COLOR, buildExtColorMap, buildExtColorFn, buildDepthColorFn, buildFileSizeColorFn, toHex } from './color-palette';
+import {
+  DEFAULT_COLOR,
+  buildExtColorMap,
+  buildExtColorFn,
+  buildDepthColorFn,
+  buildFileSizeColorFn,
+  toHex,
+} from './color-palette';
 import { buildFocusSet, fileExt, hashPath, makeCbrtNormalizer, parentPath } from './scene-utils';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const DIM               = 0.08;
-const PATH_DIM          = 0.08;
-const BG                = new Color(0x0c0e12);
+const DIM = 0.08;
+const PATH_DIM = 0.08;
+const BG = new Color(0x0c0e12);
 const EDGE_WIDTH_IN_MIN = 2;
 const EDGE_WIDTH_IN_MAX = 12;
 
@@ -51,16 +63,26 @@ const EDGE_WIDTH_IN_MAX = 12;
 @Component({
   selector: 'app-three-canvas',
   template: `<canvas #canvas style="display:block;width:100%;height:100%;"></canvas>`,
-  styles: [`:host { display: block; width: 100%; height: 100%; background: #0c0e12; }`],
+  styles: [
+    `
+      :host {
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: #0c0e12;
+      }
+    `,
+  ],
 })
 export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
-
   @Input() result: LayoutResult | null = null;
   @Input() resetCamera = false;
   @Input() display: DisplayOptions = { ...DEFAULT_DISPLAY_OPTIONS };
   @Input() cameraParam: string | null = null;
   @Input() autoOrbit = false;
-  @Output() extColorsChange = new EventEmitter<{ ext: string; label: string; color: string; count: number }[]>();
+  @Output() extColorsChange = new EventEmitter<
+    { ext: string; label: string; color: string; count: number }[]
+  >();
   @Output() cameraChange = new EventEmitter<string>();
   @Output() autoOrbitChange = new EventEmitter<boolean>();
   @ViewChild('canvas', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
@@ -80,7 +102,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   // Tooltip
   private tipEl!: HTMLDivElement;
   private tipNodePos: Vector3 | null = null;
-  private colorOf: ((n: PositionedNode) => Color) = () => DEFAULT_COLOR;
+  private colorOf: (n: PositionedNode) => Color = () => DEFAULT_COLOR;
   private pathDimmedPaths: Set<string> = new Set();
 
   // Track last result for which we emitted extColors
@@ -90,13 +112,13 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   private mouseDownX = 0;
   private mouseDownY = 0;
   private isOrbiting = false;
-  private didOrbit   = false;
+  private didOrbit = false;
 
   // Bound event handlers (needed for removeEventListener)
-  private readonly onPointerMove  = this._onPointerMove.bind(this);
+  private readonly onPointerMove = this._onPointerMove.bind(this);
   private readonly onPointerLeave = this._onPointerLeave.bind(this);
-  private readonly onMouseDown    = this._onMouseDown.bind(this);
-  private readonly onClick        = this._onClick.bind(this);
+  private readonly onMouseDown = this._onMouseDown.bind(this);
+  private readonly onClick = this._onClick.bind(this);
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -111,14 +133,15 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     this.tipEl = document.createElement('div');
     this.tipEl.className = 'orb-tip';
-    this.tipEl.style.cssText = 'position:absolute;pointer-events:none;display:none;z-index:5;font-size:13px;-webkit-text-size-adjust:none;';
+    this.tipEl.style.cssText =
+      'position:absolute;pointer-events:none;display:none;z-index:5;font-size:13px;-webkit-text-size-adjust:none;';
     this.canvasRef.nativeElement.parentElement!.appendChild(this.tipEl);
 
     const c = this.canvasRef.nativeElement;
-    c.addEventListener('pointermove',  this.onPointerMove);
+    c.addEventListener('pointermove', this.onPointerMove);
     c.addEventListener('pointerleave', this.onPointerLeave);
-    c.addEventListener('mousedown',    this.onMouseDown);
-    c.addEventListener('click',        this.onClick);
+    c.addEventListener('mousedown', this.onMouseDown);
+    c.addEventListener('click', this.onClick);
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -157,10 +180,10 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.controls.dispose();
     this.renderer.dispose();
     const c = this.canvasRef.nativeElement;
-    c.removeEventListener('pointermove',  this.onPointerMove);
+    c.removeEventListener('pointermove', this.onPointerMove);
     c.removeEventListener('pointerleave', this.onPointerLeave);
-    c.removeEventListener('mousedown',    this.onMouseDown);
-    c.removeEventListener('click',        this.onClick);
+    c.removeEventListener('mousedown', this.onMouseDown);
+    c.removeEventListener('click', this.onClick);
   }
 
   // ---------------------------------------------------------------------------
@@ -169,7 +192,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
   private initThree(): void {
     const canvas = this.canvasRef.nativeElement;
-    const w = canvas.clientWidth  || 800;
+    const w = canvas.clientWidth || 800;
     const h = canvas.clientHeight || 600;
 
     this.renderer = new WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
@@ -183,8 +206,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.camera.position.set(0, 15, 5);
 
     this.controls = new OrbitControls(this.camera, canvas);
-    this.controls.enableDamping  = true;
-    this.controls.dampingFactor  = 0.08;
+    this.controls.enableDamping = true;
+    this.controls.dampingFactor = 0.08;
     this.controls.screenSpacePanning = false;
     this.controls.autoRotateSpeed = 0.8;
     this.controls.addEventListener('start', () => {
@@ -193,7 +216,9 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       if (!this.selectedNode) this.hideTooltip();
       if (this.autoOrbit) this.autoOrbitChange.emit(false);
     });
-    this.controls.addEventListener('change', () => { if (this.isOrbiting) this.didOrbit = true; });
+    this.controls.addEventListener('change', () => {
+      if (this.isOrbiting) this.didOrbit = true;
+    });
     this.controls.addEventListener('end', () => {
       this.isOrbiting = false;
       const p = this.camera.position;
@@ -214,10 +239,10 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
         const canvas = this.canvasRef.nativeElement;
         const rect = canvas.getBoundingClientRect();
         proj.copy(this.tipNodePos).project(this.camera);
-        const sx = (proj.x + 1) / 2 * rect.width;
-        const sy = (-proj.y + 1) / 2 * rect.height;
+        const sx = ((proj.x + 1) / 2) * rect.width;
+        const sy = ((-proj.y + 1) / 2) * rect.height;
         this.tipEl.style.left = `${sx + 12}px`;
-        this.tipEl.style.top  = `${sy + 12}px`;
+        this.tipEl.style.top = `${sy + 12}px`;
       }
     };
     loop();
@@ -250,41 +275,59 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.disposeScene();
     if (!this.result) return;
 
-    const nodes    = this.result.nodes;
+    const nodes = this.result.nodes;
     const allFiles: PositionedNode[] = [];
-    const folders:  PositionedNode[] = [];
+    const folders: PositionedNode[] = [];
     for (const n of nodes) (n.isFile ? allFiles : folders).push(n);
 
     const focusSet = this.selectedNode ? buildFocusSet(nodes, this.selectedNode.path) : null;
-    const colorOf  = this.buildColorFn(allFiles, folders, nodes);
-    const { visibleFiles, visibleFolders, pathDimmedFiles, pathDimmedFolders, foldersWithContent, inDepthRange } = this.computeVisibility(allFiles, folders);
+    const colorOf = this.buildColorFn(allFiles, folders, nodes);
+    const {
+      visibleFiles,
+      visibleFolders,
+      pathDimmedFiles,
+      pathDimmedFolders,
+      foldersWithContent,
+      inDepthRange,
+    } = this.computeVisibility(allFiles, folders);
 
     const { fileDotMin, fileDotMax, folderDotMin, folderDotMax } = this.display;
-    const toFileSize   = makeCbrtNormalizer(allFiles.map(n => n.fileSize ?? 0), fileDotMin, fileDotMax);
-    const toFolderSize = makeCbrtNormalizer(folders.map(n => n.subtreeBytes),   folderDotMin, folderDotMax);
-    const toSize = (n: PositionedNode) => n.isFile ? toFileSize(n.fileSize ?? 0) : toFolderSize(n.subtreeBytes);
+    const toFileSize = makeCbrtNormalizer(
+      allFiles.map((n) => n.fileSize ?? 0),
+      fileDotMin,
+      fileDotMax,
+    );
+    const toFolderSize = makeCbrtNormalizer(
+      folders.map((n) => n.subtreeBytes),
+      folderDotMin,
+      folderDotMax,
+    );
+    const toSize = (n: PositionedNode) =>
+      n.isFile ? toFileSize(n.fileSize ?? 0) : toFolderSize(n.subtreeBytes);
 
-    const allVisible    = [...visibleFolders,    ...visibleFiles];
+    const allVisible = [...visibleFolders, ...visibleFiles];
     const allPathDimmed = [...pathDimmedFolders, ...pathDimmedFiles];
-    this.pathDimmedPaths = new Set(allPathDimmed.map(n => n.path));
+    this.pathDimmedPaths = new Set(allPathDimmed.map((n) => n.path));
     const inFocus = (path: string) => !focusSet || focusSet.has(path);
 
     if (focusSet) {
       // Node selected: focus overrides path query — all nodes participate in focus/dim split
       const allNodes = [...allVisible, ...allPathDimmed];
-      const focused  = allNodes.filter(n =>  inFocus(n.path));
-      const dimmed   = allNodes.filter(n => !inFocus(n.path));
+      const focused = allNodes.filter((n) => inFocus(n.path));
+      const dimmed = allNodes.filter((n) => !inFocus(n.path));
       if (focused.length) this.addPoints(focused, 1.0, colorOf, toSize);
-      if (dimmed.length)  this.addPoints(dimmed,  DIM, colorOf, toSize);
+      if (dimmed.length) this.addPoints(dimmed, DIM, colorOf, toSize);
     } else {
-      if (allVisible.length)    this.addPoints(allVisible,    1.0,      colorOf, toSize);
+      if (allVisible.length) this.addPoints(allVisible, 1.0, colorOf, toSize);
       if (allPathDimmed.length) this.addPoints(allPathDimmed, PATH_DIM, colorOf, toSize);
     }
 
     if (this.display.showConnectors) {
-      const nodeByPath          = new Map(nodes.map(n => [n.path, n]));
-      const edgeFolders         = folders.filter(n => foldersWithContent.has(n.path) && inDepthRange(n.path));
-      const pathDimmedFolderPaths = new Set(pathDimmedFolders.map(n => n.path));
+      const nodeByPath = new Map(nodes.map((n) => [n.path, n]));
+      const edgeFolders = folders.filter(
+        (n) => foldersWithContent.has(n.path) && inDepthRange(n.path),
+      );
+      const pathDimmedFolderPaths = new Set(pathDimmedFolders.map((n) => n.path));
       this.addEdges(edgeFolders, nodeByPath, focusSet, pathDimmedFolderPaths);
     }
   }
@@ -295,7 +338,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       if (obj instanceof Points || obj instanceof LineSegments2) {
         (obj as any).geometry.dispose();
         const mat = (obj as any).material;
-        if (Array.isArray(mat)) mat.forEach((m: any) => m.dispose()); else mat.dispose();
+        if (Array.isArray(mat)) mat.forEach((m: any) => m.dispose());
+        else mat.dispose();
       }
     }
     this.sceneObjects = [];
@@ -305,8 +349,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   // colorMode), then builds and returns a colorOf function for the active color mode.
   private buildColorFn(
     allFiles: PositionedNode[],
-    folders:  PositionedNode[],
-    nodes:    PositionedNode[],
+    folders: PositionedNode[],
+    nodes: PositionedNode[],
   ): (n: PositionedNode) => Color {
     // Always compute extension data — needed for the chip filter regardless of color mode.
     if (this.result !== this.lastEmittedResult) {
@@ -320,35 +364,62 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       }
       const extColorMap = buildExtColorMap(extCounts);
       const list = [...extColorMap.entries()].map(([ext, color]) => ({
-        ext, label: ext, color: toHex(color), count: extCounts.get(ext) ?? 0,
+        ext,
+        label: ext,
+        color: toHex(color),
+        count: extCounts.get(ext) ?? 0,
       }));
       if (noExtCount > 0) {
-        const noneEntry = { ext: '', label: '(none)', color: toHex(DEFAULT_COLOR), count: noExtCount };
-        const insertAt  = list.findIndex(e => e.count <= noExtCount);
-        if (insertAt === -1) list.push(noneEntry); else list.splice(insertAt, 0, noneEntry);
+        const noneEntry = {
+          ext: '',
+          label: '(none)',
+          color: toHex(DEFAULT_COLOR),
+          count: noExtCount,
+        };
+        const insertAt = list.findIndex((e) => e.count <= noExtCount);
+        if (insertAt === -1) list.push(noneEntry);
+        else list.splice(insertAt, 0, noneEntry);
       }
       this.extColorsChange.emit(list);
     }
 
     switch (this.display.colorMode) {
-      case 'depth': this.colorOf = buildDepthColorFn(nodes);                  break;
-      case 'size':  this.colorOf = buildFileSizeColorFn(nodes);               break;
-      default:      this.colorOf = buildExtColorFn(allFiles, folders, nodes); break;
+      case 'depth':
+        this.colorOf = buildDepthColorFn(nodes);
+        break;
+      case 'size':
+        this.colorOf = buildFileSizeColorFn(nodes);
+        break;
+      default:
+        this.colorOf = buildExtColorFn(allFiles, folders, nodes);
+        break;
     }
     return this.colorOf;
   }
 
   // Filters files and folders by the current display options. foldersWithContent drives
   // both folder visibility and connector rendering (independent of showFiles).
-  private computeVisibility(allFiles: PositionedNode[], folders: PositionedNode[]): {
-    visibleFiles:       PositionedNode[];
-    visibleFolders:     PositionedNode[];
-    pathDimmedFiles:    PositionedNode[];
-    pathDimmedFolders:  PositionedNode[];
+  private computeVisibility(
+    allFiles: PositionedNode[],
+    folders: PositionedNode[],
+  ): {
+    visibleFiles: PositionedNode[];
+    visibleFolders: PositionedNode[];
+    pathDimmedFiles: PositionedNode[];
+    pathDimmedFolders: PositionedNode[];
     foldersWithContent: Set<string>;
-    inDepthRange:       (path: string) => boolean;
+    inDepthRange: (path: string) => boolean;
   } {
-    const { fileSizeMin, fileSizeMax, hiddenExtensions, showFiles, showFolders, depthMin, depthMax, pathQuery } = this.display;
+    const {
+      fileSizeMin,
+      fileSizeMax,
+      hiddenExtensions,
+      showFiles,
+      showFolders,
+      depthMin,
+      depthMax,
+      pathQuery,
+    } = this.display;
     const hiddenExtSet = new Set(hiddenExtensions);
     const passesFilter = (n: PositionedNode) => {
       const size = n.fileSize ?? 0;
@@ -361,49 +432,87 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const filtered = allFiles.filter(passesFilter);
     for (const file of filtered) {
       let p = file.path;
-      while (p.includes('/')) { p = parentPath(p); foldersWithContent.add(p); }
+      while (p.includes('/')) {
+        p = parentPath(p);
+        foldersWithContent.add(p);
+      }
     }
     if (filtered.length) foldersWithContent.add(''); // root
 
-    const nodeDepth = (path: string) => path === '' ? 0 : path.split('/').length;
-    const inDepthRange = (path: string) => { const d = nodeDepth(path); return d >= depthMin && d <= depthMax; };
+    const nodeDepth = (path: string) => (path === '' ? 0 : path.split('/').length);
+    const inDepthRange = (path: string) => {
+      const d = nodeDepth(path);
+      return d >= depthMin && d <= depthMax;
+    };
 
     // Folders that have content AND are within the depth range (independent of showFolders,
     // so files can be culled by their parent's depth visibility even when showFolders is off).
     const depthVisibleFolderPaths = new Set(
-      folders.filter(n => foldersWithContent.has(n.path) && inDepthRange(n.path)).map(n => n.path)
+      folders
+        .filter((n) => foldersWithContent.has(n.path) && inDepthRange(n.path))
+        .map((n) => n.path),
     );
 
     // Path query: walk ancestors of matching files to compute which folders contain a match.
     const q = pathQuery.trim().toLowerCase();
     const foldersMatchingQuery = new Set<string>();
     if (q) {
-      for (const file of filtered.filter(n => depthVisibleFolderPaths.has(parentPath(n.path)) && n.path.toLowerCase().includes(q))) {
+      for (const file of filtered.filter(
+        (n) => depthVisibleFolderPaths.has(parentPath(n.path)) && n.path.toLowerCase().includes(q),
+      )) {
         foldersMatchingQuery.add(file.path);
         let p = file.path;
-        while (p.includes('/')) { p = parentPath(p); foldersMatchingQuery.add(p); }
+        while (p.includes('/')) {
+          p = parentPath(p);
+          foldersMatchingQuery.add(p);
+        }
       }
       if (foldersMatchingQuery.size) foldersMatchingQuery.add('');
     }
 
-    const matchesQuery     = (n: PositionedNode) => !q || n.path.toLowerCase().includes(q);
-    const folderInQuery    = (n: PositionedNode) => !q || foldersMatchingQuery.has(n.path);
+    const matchesQuery = (n: PositionedNode) => !q || n.path.toLowerCase().includes(q);
+    const folderInQuery = (n: PositionedNode) => !q || foldersMatchingQuery.has(n.path);
 
-    const visibleFolders    = showFolders ? folders.filter(n => depthVisibleFolderPaths.has(n.path) && folderInQuery(n)) : [];
-    const pathDimmedFolders = showFolders && q ? folders.filter(n => depthVisibleFolderPaths.has(n.path) && !folderInQuery(n)) : [];
-    const visibleFiles      = showFiles ? allFiles.filter(n => passesFilter(n) && depthVisibleFolderPaths.has(parentPath(n.path)) && matchesQuery(n)) : [];
-    const pathDimmedFiles   = showFiles && q ? allFiles.filter(n => passesFilter(n) && depthVisibleFolderPaths.has(parentPath(n.path)) && !matchesQuery(n)) : [];
+    const visibleFolders = showFolders
+      ? folders.filter((n) => depthVisibleFolderPaths.has(n.path) && folderInQuery(n))
+      : [];
+    const pathDimmedFolders =
+      showFolders && q
+        ? folders.filter((n) => depthVisibleFolderPaths.has(n.path) && !folderInQuery(n))
+        : [];
+    const visibleFiles = showFiles
+      ? allFiles.filter(
+          (n) =>
+            passesFilter(n) && depthVisibleFolderPaths.has(parentPath(n.path)) && matchesQuery(n),
+        )
+      : [];
+    const pathDimmedFiles =
+      showFiles && q
+        ? allFiles.filter(
+            (n) =>
+              passesFilter(n) &&
+              depthVisibleFolderPaths.has(parentPath(n.path)) &&
+              !matchesQuery(n),
+          )
+        : [];
 
-    return { visibleFiles, visibleFolders, pathDimmedFiles, pathDimmedFolders, foldersWithContent, inDepthRange };
+    return {
+      visibleFiles,
+      visibleFolders,
+      pathDimmedFiles,
+      pathDimmedFolders,
+      foldersWithContent,
+      inDepthRange,
+    };
   }
 
   private addPoints(
     subset: PositionedNode[],
     opacity: number,
     colorOf: (n: PositionedNode) => Color,
-    toSize:  (n: PositionedNode) => number,
+    toSize: (n: PositionedNode) => number,
   ): void {
-    const n   = subset.length;
+    const n = subset.length;
     const pos = new Float32Array(n * 3);
     const col = new Float32Array(n * 3);
     const siz = new Float32Array(n);
@@ -411,11 +520,11 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     for (let i = 0; i < n; i++) {
       const node = subset[i];
-      pos[i * 3]     = -node.x; // negate X to preserve handedness after Y↔Z swap
-      pos[i * 3 + 1] = node.z;  // layout Z is the elevation axis → Three.js Y (up)
+      pos[i * 3] = -node.x; // negate X to preserve handedness after Y↔Z swap
+      pos[i * 3 + 1] = node.z; // layout Z is the elevation axis → Three.js Y (up)
       pos[i * 3 + 2] = node.y;
       const c = colorOf(node);
-      col[i * 3]     = c.r;
+      col[i * 3] = c.r;
       col[i * 3 + 1] = c.g;
       col[i * 3 + 2] = c.b;
       siz[i] = toSize(node);
@@ -423,22 +532,22 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     }
 
     const geo = new BufferGeometry();
-    geo.setAttribute('position',  new BufferAttribute(pos, 3));
-    geo.setAttribute('aColor',    new BufferAttribute(col, 3));
-    geo.setAttribute('aSize',     new BufferAttribute(siz, 1));
+    geo.setAttribute('position', new BufferAttribute(pos, 3));
+    geo.setAttribute('aColor', new BufferAttribute(col, 3));
+    geo.setAttribute('aSize', new BufferAttribute(siz, 1));
     geo.setAttribute('aIsFolder', new BufferAttribute(fld, 1));
     geo.userData['nodes'] = subset;
 
     const mat = new ShaderMaterial({
-      vertexShader:   VERT,
+      vertexShader: VERT,
       fragmentShader: FRAG,
       uniforms: {
-        uOpacity:    { value: opacity },
+        uOpacity: { value: opacity },
         uPixelRatio: { value: devicePixelRatio },
       },
       transparent: true,
-      depthWrite:  opacity >= 1,
-      depthFunc:   LessEqualDepth,
+      depthWrite: opacity >= 1,
+      depthFunc: LessEqualDepth,
     });
 
     const points = new Points(geo, mat);
@@ -453,14 +562,14 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     focusSet: Set<string> | null,
     pathDimmedPaths?: Set<string>,
   ): void {
-    const inFocus    = (path: string) => !focusSet || focusSet.has(path);
-    const isPathDim  = (path: string) => !focusSet && !!pathDimmedPaths?.has(path);
-    const canvas  = this.canvasRef.nativeElement;
+    const inFocus = (path: string) => !focusSet || focusSet.has(path);
+    const isPathDim = (path: string) => !focusSet && !!pathDimmedPaths?.has(path);
+    const canvas = this.canvasRef.nativeElement;
 
     const DEPTH_BUCKETS = 8;
-    const zValues = folders.map(n => n.z);
-    const zMin    = Math.min(...zValues, 0);
-    const zRange  = Math.max(...zValues, 1) - zMin || 1;
+    const zValues = folders.map((n) => n.z);
+    const zMin = Math.min(...zValues, 0);
+    const zRange = Math.max(...zValues, 1) - zMin || 1;
 
     // Group segments by (focused, depthBucket, widthBucket) — each batch = one material
     type Batch = { pos: number[]; col: number[]; depthAlpha: number; width: number };
@@ -468,24 +577,37 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     for (const node of folders) {
       if (!node.path) continue;
-      const pp     = parentPath(node.path);
+      const pp = parentPath(node.path);
       const parent = nodeByPath.get(pp);
       if (!parent) continue;
 
-      const hue        = hashPath(node.path) % 360;
-      const c          = new Color(`hsl(${hue},20%,60%)`);
-      const focused    = inFocus(node.path) && inFocus(pp);
+      const hue = hashPath(node.path) % 360;
+      const c = new Color(`hsl(${hue},20%,60%)`);
+      const focused = inFocus(node.path) && inFocus(pp);
       const pathDimmed = isPathDim(node.path) || isPathDim(pp);
       const depthBucket = Math.min(
-        Math.floor((node.z - zMin) / zRange * DEPTH_BUCKETS), DEPTH_BUCKETS - 1);
+        Math.floor(((node.z - zMin) / zRange) * DEPTH_BUCKETS),
+        DEPTH_BUCKETS - 1,
+      );
       const { connectorOpacityMin, connectorOpacityMax } = this.display;
-      const depthAlpha  = focused
-        ? (pathDimmed ? PATH_DIM : connectorOpacityMax - (connectorOpacityMax - connectorOpacityMin) * (depthBucket / (DEPTH_BUCKETS - 1)))
+      const depthAlpha = focused
+        ? pathDimmed
+          ? PATH_DIM
+          : connectorOpacityMax -
+            (connectorOpacityMax - connectorOpacityMin) * (depthBucket / (DEPTH_BUCKETS - 1))
         : DIM;
-      const t = Math.max(0, Math.min(1, (node.connectionWidth - EDGE_WIDTH_IN_MIN) / (EDGE_WIDTH_IN_MAX - EDGE_WIDTH_IN_MIN)));
-      const scaledW = this.display.connectorWidthMin + (this.display.connectorWidthMax - this.display.connectorWidthMin) * t;
+      const t = Math.max(
+        0,
+        Math.min(
+          1,
+          (node.connectionWidth - EDGE_WIDTH_IN_MIN) / (EDGE_WIDTH_IN_MAX - EDGE_WIDTH_IN_MIN),
+        ),
+      );
+      const scaledW =
+        this.display.connectorWidthMin +
+        (this.display.connectorWidthMax - this.display.connectorWidthMin) * t;
       const wBucket = Math.round(scaledW * 2) / 2;
-      const key     = `${focused ? 1 : 0}-${pathDimmed ? 1 : 0}-${depthBucket}-${wBucket}`;
+      const key = `${focused ? 1 : 0}-${pathDimmed ? 1 : 0}-${depthBucket}-${wBucket}`;
 
       if (!batches.has(key)) batches.set(key, { pos: [], col: [], depthAlpha, width: scaledW });
       const b = batches.get(key)!;
@@ -495,20 +617,20 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     }
 
     for (const [, { pos, col, width, depthAlpha }] of batches) {
-      const geo      = new LineSegmentsGeometry();
+      const geo = new LineSegmentsGeometry();
       geo.setPositions(pos);
       geo.setColors(col);
       const mat = new LineMaterial({
-        vertexColors:        true,
-        transparent:         true,
-        opacity:             depthAlpha,
-        linewidth:           width,
-        depthWrite:          false,
-        resolution:          new Vector2(canvas.clientWidth, canvas.clientHeight),
-        worldUnits:          false,
-        polygonOffset:       true,
+        vertexColors: true,
+        transparent: true,
+        opacity: depthAlpha,
+        linewidth: width,
+        depthWrite: false,
+        resolution: new Vector2(canvas.clientWidth, canvas.clientHeight),
+        worldUnits: false,
+        polygonOffset: true,
         polygonOffsetFactor: 1,
-        polygonOffsetUnits:  1,
+        polygonOffsetUnits: 1,
       });
       const segs = new LineSegments2(geo, mat);
       segs.renderOrder = 1; // draw after dots; depthWrite:false lets dots show through
@@ -523,7 +645,10 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
   private restoreCamera(param: string): void {
     const parts = param.split(',').map(Number);
-    if (parts.length !== 6 || parts.some(isNaN)) { this.fitCamera(); return; }
+    if (parts.length !== 6 || parts.some(isNaN)) {
+      this.fitCamera();
+      return;
+    }
     const [px, py, pz, tx, ty, tz] = parts;
     this.controls.target.set(tx, ty, tz);
     this.camera.position.set(px, py, pz);
@@ -534,7 +659,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   resetToDefaultCamera(): void {
     this.fitCamera();
     const r = (v: number) => Math.round(v * 100) / 100;
-    const p = this.camera.position, t = this.controls.target;
+    const p = this.camera.position,
+      t = this.controls.target;
     this.cameraChange.emit(`${r(p.x)},${r(p.y)},${r(p.z)},${r(t.x)},${r(t.y)},${r(t.z)}`);
   }
 
@@ -544,47 +670,57 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     // Refresh aspect ratio from actual canvas size
     const canvas = this.canvasRef.nativeElement;
-    const w = canvas.clientWidth, h = canvas.clientHeight;
+    const w = canvas.clientWidth,
+      h = canvas.clientHeight;
     if (w && h) {
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
     }
 
     // Bounding box directly from node positions in Three.js space (-n.x, n.z, n.y)
-    let minX = Infinity, maxX = -Infinity;
-    let minY = Infinity, maxY = -Infinity;
-    let minZ = Infinity, maxZ = -Infinity;
+    let minX = Infinity,
+      maxX = -Infinity;
+    let minY = Infinity,
+      maxY = -Infinity;
+    let minZ = Infinity,
+      maxZ = -Infinity;
     for (const n of nodes) {
-      const x = -n.x, y = n.z, z = n.y;
-      if (x < minX) minX = x; if (x > maxX) maxX = x;
-      if (y < minY) minY = y; if (y > maxY) maxY = y;
-      if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+      const x = -n.x,
+        y = n.z,
+        z = n.y;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+      if (z < minZ) minZ = z;
+      if (z > maxZ) maxZ = z;
     }
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
     const cz = (minZ + maxZ) / 2;
 
-    const vFov  = MathUtils.degToRad(this.camera.fov);
-    const hFov  = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
-    const tanH  = Math.tan(hFov / 2);
-    const tanV  = Math.tan(vFov / 2);
+    const vFov = MathUtils.degToRad(this.camera.fov);
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
+    const tanH = Math.tan(hFov / 2);
+    const tanV = Math.tan(vFov / 2);
 
     // Camera axes for fixed elevation angle (looking from +Z side, slightly above)
     const elev = 0.2; // ~11°
     // forward d = (0, -sin, -cos), right r = (1, 0, 0), up u = (0, cos, -sin)
-    const sd = Math.sin(elev), cd = Math.cos(elev);
+    const sd = Math.sin(elev),
+      cd = Math.cos(elev);
 
     // Exact minimum dist: for each node, dist >= |dx|/tanH - dz  AND  |dy|/tanV - dz
     // where dx/dy/dz are projections of (node - center) onto camera right/up/forward axes.
     let minDist = 0;
     for (const n of nodes) {
-      const vx = -n.x - cx;   // Three.js coords relative to scene center
-      const vy =  n.z - cy;
-      const vz =  n.y - cz;
+      const vx = -n.x - cx; // Three.js coords relative to scene center
+      const vy = n.z - cy;
+      const vz = n.y - cz;
 
-      const dx =  vx;                   // dot(v, right=(1,0,0))
-      const dy =  vy * cd - vz * sd;    // dot(v, up=(0,cos,-sin))
-      const dz = -vy * sd - vz * cd;    // dot(v, forward=(0,-sin,-cos))
+      const dx = vx; // dot(v, right=(1,0,0))
+      const dy = vy * cd - vz * sd; // dot(v, up=(0,cos,-sin))
+      const dz = -vy * sd - vz * cd; // dot(v, forward=(0,-sin,-cos))
 
       minDist = Math.max(minDist, Math.abs(dx) / tanH - dz);
       minDist = Math.max(minDist, Math.abs(dy) / tanV - dz);
@@ -601,9 +737,12 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   // Raycasting (hover + click)
   // ---------------------------------------------------------------------------
 
-  private raycast(event: MouseEvent, exclude?: Set<string>): { node: PositionedNode; worldPos: Vector3 } | null {
+  private raycast(
+    event: MouseEvent,
+    exclude?: Set<string>,
+  ): { node: PositionedNode; worldPos: Vector3 } | null {
     const canvas = this.canvasRef.nativeElement;
-    const rect   = canvas.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
     const W = rect.width;
@@ -617,9 +756,9 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     for (const obj of this.sceneObjects) {
       if (!(obj instanceof Points)) continue;
-      const nodes   = obj.geometry.userData['nodes'] as PositionedNode[];
+      const nodes = obj.geometry.userData['nodes'] as PositionedNode[];
       const posAttr = obj.geometry.getAttribute('position') as BufferAttribute;
-      const sizAttr = obj.geometry.getAttribute('aSize')    as BufferAttribute;
+      const sizAttr = obj.geometry.getAttribute('aSize') as BufferAttribute;
 
       for (let i = 0; i < nodes.length; i++) {
         if (exclude?.has(nodes[i].path)) continue;
@@ -631,8 +770,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
         if (proj.z > 1) continue; // behind near/far clip
 
         // NDC → CSS pixels
-        const sx = (proj.x + 1) / 2 * W;
-        const sy = (-proj.y + 1) / 2 * H;
+        const sx = ((proj.x + 1) / 2) * W;
+        const sy = ((-proj.y + 1) / 2) * H;
 
         const dx = mouseX - sx;
         const dy = mouseY - sy;
@@ -708,7 +847,10 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   }
 
   private _onClick(e: MouseEvent): void {
-    if (this.didOrbit) { this.didOrbit = false; return; }
+    if (this.didOrbit) {
+      this.didOrbit = false;
+      return;
+    }
     const dx = e.clientX - this.mouseDownX;
     const dy = e.clientY - this.mouseDownY;
     if (dx * dx + dy * dy > 16) return; // drag, not click

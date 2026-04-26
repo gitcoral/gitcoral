@@ -16,7 +16,7 @@ interface LayoutNode {
 }
 
 const GOLDEN_F = Math.PI * (3 - Math.sqrt(5)); // golden-angle step for Fibonacci sphere
-const SNAP     = 1e-10;                         // snap near-zero coords to exact zero
+const SNAP = 1e-10; // snap near-zero coords to exact zero
 
 function toLayoutNode(src: TreeStructure): LayoutNode {
   return {
@@ -25,14 +25,16 @@ function toLayoutNode(src: TreeStructure): LayoutNode {
     fileSize: src.fileSize,
     subtreeBytes: src.subtreeBytes,
     children: src.children.map(toLayoutNode),
-    x: 0, y: 0, z: 0,
+    x: 0,
+    y: 0,
+    z: 0,
     connectionWidth: 0,
   };
 }
 
 function flattenLayoutTree(root: LayoutNode): PositionedNode[] {
   const result: PositionedNode[] = [];
-  const stack: LayoutNode[]      = [root];
+  const stack: LayoutNode[] = [root];
   while (stack.length) {
     const { children, ...node } = stack.pop()!;
     result.push(node);
@@ -56,18 +58,24 @@ function maxFileCbrtInTree(node: LayoutNode): number {
 export function layoutTree(root: TreeStructure, params: LayoutParams): PositionedNode[] {
   const { layerHeight, zScale, buoyancy, repulsion, spread, sphereD } = params;
 
-  const layoutRoot      = toLayoutNode(root);
-  const maxSubtreeCbrt  = Math.cbrt(layoutRoot.subtreeBytes);
-  const maxFileCbrt     = maxFileCbrtInTree(layoutRoot);
+  const layoutRoot = toLayoutNode(root);
+  const maxSubtreeCbrt = Math.cbrt(layoutRoot.subtreeBytes);
+  const maxFileCbrt = maxFileCbrtInTree(layoutRoot);
 
   function place(n: LayoutNode, hintAngle: number, conn: number): void {
-    const px = n.x, py = n.y, pz = n.z;
+    const px = n.x,
+      py = n.y,
+      pz = n.z;
 
     const folders = n.children
-      .filter(c => !c.isFile)
+      .filter((c) => !c.isFile)
       .sort((a, b) => b.subtreeBytes - a.subtreeBytes);
 
-    const coords = simulate(folders.map(f => f.subtreeBytes), buoyancy, repulsion);
+    const coords = simulate(
+      folders.map((f) => f.subtreeBytes),
+      buoyancy,
+      repulsion,
+    );
 
     for (let i = 0; i < folders.length; i++) {
       const sf = folders[i];
@@ -88,8 +96,8 @@ export function layoutTree(root: TreeStructure, params: LayoutParams): Positione
       // Stepped (not continuous) so edge-batching produces fewer distinct LineMaterial instances.
       const t = Math.cbrt(sf.subtreeBytes) / maxSubtreeCbrt;
       const N_BUCKETS = 6;
-      const bucket    = Math.min(N_BUCKETS - 1, Math.floor(t * N_BUCKETS));
-      sf.connectionWidth = 2 + (12 - 2) * bucket / (N_BUCKETS - 1);
+      const bucket = Math.min(N_BUCKETS - 1, Math.floor(t * N_BUCKETS));
+      sf.connectionWidth = 2 + ((12 - 2) * bucket) / (N_BUCKETS - 1);
 
       // h * spread: vertical displacement of this node becomes the sphere radius for its
       // children — tighter sphere the deeper we go, floored to avoid vanishing connectors.
@@ -98,14 +106,14 @@ export function layoutTree(root: TreeStructure, params: LayoutParams): Positione
     }
 
     // Files — Fibonacci sphere cloud, radius scales with √N and average file size
-    const files = n.children.filter(c => c.isFile);
-    const Nf    = files.length;
+    const files = n.children.filter((c) => c.isFile);
+    const Nf = files.length;
     if (Nf > 0) {
       const avgFileCbrt = files.reduce((s, f) => s + Math.cbrt(f.fileSize ?? 0), 0) / Nf;
-      const sizeScale   = maxFileCbrt > 0 ? avgFileCbrt / maxFileCbrt : 0;
-      const cloudR      = (sphereD / 2) * Math.sqrt(Nf) * (1 + sizeScale);
+      const sizeScale = maxFileCbrt > 0 ? avgFileCbrt / maxFileCbrt : 0;
+      const cloudR = (sphereD / 2) * Math.sqrt(Nf) * (1 + sizeScale);
       for (let i = 0; i < Nf; i++) {
-        const f    = files[i];
+        const f = files[i];
         const cosT = 1 - (2 * i + 1) / Nf;
         const sinT = Math.sqrt(Math.max(0, 1 - cosT * cosT));
         const phiF = i * GOLDEN_F;

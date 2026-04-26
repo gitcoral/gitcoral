@@ -1,10 +1,27 @@
-import { Component, DestroyRef, OnInit, ViewChild, effect, inject, signal, untracked } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  OnInit,
+  ViewChild,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { GithubService } from '../../../core/services/github';
 import { LayoutService } from '../../../core/services/layout';
-import { ColorMode, DEFAULT_DISPLAY_OPTIONS, DEFAULT_LAYOUT_PARAMS, DisplayOptions, LayoutParams, LoadingState, TreeStructure } from '../../../shared/models/tree-node.model';
+import {
+  ColorMode,
+  DEFAULT_DISPLAY_OPTIONS,
+  DEFAULT_LAYOUT_PARAMS,
+  DisplayOptions,
+  LayoutParams,
+  LoadingState,
+  TreeStructure,
+} from '../../../shared/models/tree-node.model';
 import { ControlsPanel, RepoSubmitEvent } from '../controls-panel/controls-panel';
 import { ThreeCanvas } from '../three-canvas/three-canvas';
 
@@ -15,7 +32,6 @@ import { ThreeCanvas } from '../three-canvas/three-canvas';
   styleUrl: './viewer.scss',
 })
 export class Viewer implements OnInit {
-
   @ViewChild(ThreeCanvas) private threeCanvas!: ThreeCanvas;
 
   resetCamera = false;
@@ -28,19 +44,23 @@ export class Viewer implements OnInit {
   initialQuery = '';
   initialColorMode: ColorMode = 'type';
 
-  get result() { return this.layout.result; }
-  get error()  { return this.layout.error; }
+  get result() {
+    return this.layout.result;
+  }
+  get error() {
+    return this.layout.error;
+  }
 
   get maxFileSize(): number {
     const nodes = this.layout.result()?.nodes;
     if (!nodes) return 0;
-    return Math.max(0, ...nodes.filter(n => n.isFile).map(n => n.fileSize ?? 0));
+    return Math.max(0, ...nodes.filter((n) => n.isFile).map((n) => n.fileSize ?? 0));
   }
 
   get maxDepth(): number {
     const nodes = this.layout.result()?.nodes;
     if (!nodes) return 0;
-    return Math.max(0, ...nodes.map(n => n.path === '' ? 0 : n.path.split('/').length));
+    return Math.max(0, ...nodes.map((n) => (n.path === '' ? 0 : n.path.split('/').length)));
   }
 
   private rawRoot: TreeStructure | null = null;
@@ -66,7 +86,7 @@ export class Viewer implements OnInit {
     // React to route param changes — covers initial load and browser back/forward.
     // In ngOnInit (not constructor) so the view renders 'idle' before 'fetching' is set,
     // ensuring "Fetching…" is always visible on initial URL load.
-    this.route.params.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
+    this.route.params.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const { owner, repo } = params;
       if (owner && repo) {
         this.initialRepo = `${owner}/${repo}`;
@@ -74,9 +94,16 @@ export class Viewer implements OnInit {
         const q = this.route.snapshot.queryParams['q'] ?? '';
         const color = this.route.snapshot.queryParams['color'] ?? '';
         this.initialQuery = q;
-        this.initialColorMode = (['type', 'depth', 'size'] as ColorMode[]).includes(color as ColorMode)
-          ? color as ColorMode : 'type';
-        this.display = { ...DEFAULT_DISPLAY_OPTIONS, pathQuery: q, colorMode: this.initialColorMode };
+        this.initialColorMode = (['type', 'depth', 'size'] as ColorMode[]).includes(
+          color as ColorMode,
+        )
+          ? (color as ColorMode)
+          : 'type';
+        this.display = {
+          ...DEFAULT_DISPLAY_OPTIONS,
+          pathQuery: q,
+          colorMode: this.initialColorMode,
+        };
         // Defer to next macrotask so Angular completes its initial render (status='idle')
         // before loadRepo sets status='fetching' — otherwise the fetching state is skipped.
         setTimeout(() => this.loadRepo(owner, repo));
@@ -87,7 +114,10 @@ export class Viewer implements OnInit {
   async onRepoSubmit(event: RepoSubmitEvent): Promise<void> {
     this.layout.error.set(null);
     const parsed = this.github.parseRepoUrl(event.url);
-    if (!parsed) { this.layout.error.set('Invalid GitHub URL'); return; }
+    if (!parsed) {
+      this.layout.error.set('Invalid GitHub URL');
+      return;
+    }
 
     this.cameraParam = null;
     this.router.navigate([parsed.owner, parsed.repo], { replaceUrl: false });
@@ -112,7 +142,7 @@ export class Viewer implements OnInit {
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {
-        q:     display.pathQuery  || null,
+        q: display.pathQuery || null,
         color: display.colorMode !== 'type' ? display.colorMode : null,
       },
       queryParamsHandling: 'merge',

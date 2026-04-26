@@ -16,38 +16,49 @@ describe('GithubService', () => {
 
   describe('parseRepoUrl', () => {
     it('parses SSH URL with .git', () => {
-      expect(service.parseRepoUrl('git@github.com:owner/repo.git'))
-        .toEqual({ owner: 'owner', repo: 'repo' });
+      expect(service.parseRepoUrl('git@github.com:owner/repo.git')).toEqual({
+        owner: 'owner',
+        repo: 'repo',
+      });
     });
 
     it('parses SSH URL without .git', () => {
-      expect(service.parseRepoUrl('git@github.com:owner/repo'))
-        .toEqual({ owner: 'owner', repo: 'repo' });
+      expect(service.parseRepoUrl('git@github.com:owner/repo')).toEqual({
+        owner: 'owner',
+        repo: 'repo',
+      });
     });
 
     it('parses HTTPS URL', () => {
-      expect(service.parseRepoUrl('https://github.com/owner/repo'))
-        .toEqual({ owner: 'owner', repo: 'repo' });
+      expect(service.parseRepoUrl('https://github.com/owner/repo')).toEqual({
+        owner: 'owner',
+        repo: 'repo',
+      });
     });
 
     it('parses HTTPS URL with .git suffix', () => {
-      expect(service.parseRepoUrl('https://github.com/owner/repo.git'))
-        .toEqual({ owner: 'owner', repo: 'repo' });
+      expect(service.parseRepoUrl('https://github.com/owner/repo.git')).toEqual({
+        owner: 'owner',
+        repo: 'repo',
+      });
     });
 
     it('parses HTTPS URL with trailing slash', () => {
-      expect(service.parseRepoUrl('https://github.com/owner/repo/'))
-        .toEqual({ owner: 'owner', repo: 'repo' });
+      expect(service.parseRepoUrl('https://github.com/owner/repo/')).toEqual({
+        owner: 'owner',
+        repo: 'repo',
+      });
     });
 
     it('parses github.com URL without scheme', () => {
-      expect(service.parseRepoUrl('github.com/owner/repo'))
-        .toEqual({ owner: 'owner', repo: 'repo' });
+      expect(service.parseRepoUrl('github.com/owner/repo')).toEqual({
+        owner: 'owner',
+        repo: 'repo',
+      });
     });
 
     it('parses short owner/repo form', () => {
-      expect(service.parseRepoUrl('owner/repo'))
-        .toEqual({ owner: 'owner', repo: 'repo' });
+      expect(service.parseRepoUrl('owner/repo')).toEqual({ owner: 'owner', repo: 'repo' });
     });
 
     it('returns null for a bare name with no slash', () => {

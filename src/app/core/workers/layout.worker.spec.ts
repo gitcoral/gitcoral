@@ -11,7 +11,7 @@ const PARAMS: LayoutParams = {
   zScale: 0.6,
   buoyancy: 3.0,
   repulsion: 1.5,
-  spread: 0.80,
+  spread: 0.8,
   sphereD: 0.02,
 };
 
@@ -25,7 +25,7 @@ function makeFolder(path: string, children: TreeStructure[]): TreeStructure {
 }
 
 function byPath(nodes: PositionedNode[], path: string): PositionedNode {
-  const n = nodes.find(n => n.path === path);
+  const n = nodes.find((n) => n.path === path);
   if (!n) throw new Error(`node not found: "${path}"`);
   return n;
 }
@@ -37,7 +37,7 @@ function byPath(nodes: PositionedNode[], path: string): PositionedNode {
 describe('layoutTree', () => {
   it('places root at origin', () => {
     const nodes = layoutTree(makeFolder('', []), PARAMS);
-    const root  = byPath(nodes, '');
+    const root = byPath(nodes, '');
     expect(root.x).toBe(0);
     expect(root.y).toBe(0);
     expect(root.z).toBe(0);
@@ -48,25 +48,25 @@ describe('layoutTree', () => {
   });
 
   it('returns a flat array — no node has children', () => {
-    const tree  = makeFolder('', [makeFile('a.ts'), makeFile('b.ts'), makeFile('c.ts')]);
+    const tree = makeFolder('', [makeFile('a.ts'), makeFile('b.ts'), makeFile('c.ts')]);
     const nodes = layoutTree(tree, PARAMS);
     for (const n of nodes) expect((n as any).children).toBeUndefined();
   });
 
   it('does not mutate the input TreeStructure', () => {
-    const file   = makeFile('a.ts');
-    const input  = makeFolder('', [file]);
+    const file = makeFile('a.ts');
+    const input = makeFolder('', [file]);
     layoutTree(input, PARAMS);
     expect((input as any).x).toBeUndefined();
-    expect((file  as any).x).toBeUndefined();
+    expect((file as any).x).toBeUndefined();
   });
 
   it('places files on a Fibonacci sphere of radius cloudR around parent', () => {
     const files = [makeFile('a.ts'), makeFile('b.ts'), makeFile('c.ts')];
     const nodes = layoutTree(makeFolder('', files), PARAMS);
-    const root  = byPath(nodes, '');
+    const root = byPath(nodes, '');
     // All files share the same cloudR — verify they are equidistant from parent
-    const dists = ['a.ts', 'b.ts', 'c.ts'].map(name => {
+    const dists = ['a.ts', 'b.ts', 'c.ts'].map((name) => {
       const f = byPath(nodes, name);
       return Math.sqrt((f.x - root.x) ** 2 + (f.y - root.y) ** 2 + (f.z - root.z) ** 2);
     });
@@ -74,26 +74,26 @@ describe('layoutTree', () => {
   });
 
   it('folder connectionWidth is in [2, 12]', () => {
-    const tree  = makeFolder('', [makeFolder('src', [makeFile('src/a.ts'), makeFile('src/b.ts')])]);
+    const tree = makeFolder('', [makeFolder('src', [makeFile('src/a.ts'), makeFile('src/b.ts')])]);
     const nodes = layoutTree(tree, PARAMS);
-    const src   = byPath(nodes, 'src');
+    const src = byPath(nodes, 'src');
     expect(src.connectionWidth).toBeGreaterThanOrEqual(2);
     expect(src.connectionWidth).toBeLessThanOrEqual(12);
   });
 
   it('single subfolder is placed at non-zero distance from root', () => {
-    const tree  = makeFolder('', [makeFolder('src', [makeFile('src/a.ts')])]);
+    const tree = makeFolder('', [makeFolder('src', [makeFile('src/a.ts')])]);
     const nodes = layoutTree(tree, PARAMS);
-    const src   = byPath(nodes, 'src');
+    const src = byPath(nodes, 'src');
     expect(Math.sqrt(src.x ** 2 + src.y ** 2 + src.z ** 2)).toBeGreaterThan(0);
   });
 
   it('deeper folders have greater z than their parent', () => {
-    const tree  = makeFolder('', [makeFolder('a', [makeFolder('a/b', [makeFile('a/b/x.ts')])])]);
+    const tree = makeFolder('', [makeFolder('a', [makeFolder('a/b', [makeFile('a/b/x.ts')])])]);
     const nodes = layoutTree(tree, PARAMS);
-    const root  = byPath(nodes, '');
-    const mid   = byPath(nodes, 'a');
-    const deep  = byPath(nodes, 'a/b');
+    const root = byPath(nodes, '');
+    const mid = byPath(nodes, 'a');
+    const deep = byPath(nodes, 'a/b');
     expect(mid.z).toBeGreaterThan(root.z);
     expect(deep.z).toBeGreaterThan(mid.z);
   });

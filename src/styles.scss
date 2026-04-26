@@ -3,27 +3,32 @@
 @include mat.core();
 
 // Dark theme tuned to the app's color palette
-$orb-theme: mat.define-theme((
-  color: (
-    theme-type: dark,
-    primary: mat.$azure-palette,
-  ),
-  density: (
-    scale: -3,
-  ),
-));
+$orb-theme: mat.define-theme(
+  (
+    color: (
+      theme-type: dark,
+      primary: mat.$azure-palette,
+    ),
+    density: (
+      scale: -3,
+    ),
+  )
+);
 
 html {
   @include mat.all-component-themes($orb-theme);
 }
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html, body {
+html,
+body {
   width: 100%;
   height: 100%;
   background: #0c0e12;
