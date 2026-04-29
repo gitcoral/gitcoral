@@ -52,3 +52,4 @@ Thumbs.db
 !.dev.vars.example
 .env*
 !.env.example
+.claude/settings.json
