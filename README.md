@@ -11,8 +11,8 @@
 
   <p>
     <a href="https://gitcoral.com"><strong>Live Demo →</strong></a> ·
-    <a href="https://github.com/moikot/gitcoral/issues/new?template=bug_report.md">Report Bug</a> ·
-    <a href="https://github.com/moikot/gitcoral/issues/new?template=feature_request.md">Request Feature</a>
+    <a href="https://github.com/gitcoral/gitcoral/issues/new?template=bug_report.md">Report Bug</a> ·
+    <a href="https://github.com/gitcoral/gitcoral/issues/new?template=feature_request.md">Request Feature</a>
   </p>
 
   <p>
@@ -20,8 +20,8 @@
     <a href="https://threejs.org"><img src="https://img.shields.io/badge/Three.js-0.183-black?logo=threedotjs&logoColor=white" alt="Three.js" /></a>
     <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-5-blue?logo=typescript&logoColor=white" alt="TypeScript" /></a>
     <a href="https://www.khronos.org/webgl/"><img src="https://img.shields.io/badge/WebGL-powered-green?logo=webgl&logoColor=white" alt="WebGL" /></a>
-    <a href="https://github.com/moikot/gitcoral/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-brightgreen" alt="MIT License" /></a>
-    <a href="https://github.com/moikot/gitcoral/actions/workflows/ci.yml"><img src="https://github.com/moikot/gitcoral/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+    <a href="https://github.com/gitcoral/gitcoral/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-brightgreen" alt="MIT License" /></a>
+    <a href="https://github.com/gitcoral/gitcoral/actions/workflows/ci.yml"><img src="https://github.com/gitcoral/gitcoral/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   </p>
 </div>
 
@@ -111,7 +111,7 @@ npm install -g @angular/cli
 ### Install
 
 ```bash
-git clone https://github.com/moikot/gitcoral.git
+git clone https://github.com/gitcoral/gitcoral.git
 cd gitcoral
 npm install
 ```
