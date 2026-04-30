@@ -288,20 +288,31 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.cachedFolders = [];
     for (const n of nodes) (n.isFile ? this.cachedFiles : this.cachedFolders).push(n);
 
-    const allNodes = [...this.cachedFolders, ...this.cachedFiles];
-    const n = allNodes.length;
+    const n = nodes.length;
     const pos = new Float32Array(n * 3);
     const fld = new Float32Array(n);
     const col = new Float32Array(n * 3);
     const siz = new Float32Array(n);
     const alp = new Float32Array(n);
 
-    for (let i = 0; i < n; i++) {
-      const node = allNodes[i];
+    // Folders first, then files — matches the order expected by updateScene and raycast.
+    const allNodes: PositionedNode[] = new Array(n);
+    let i = 0;
+    for (const node of this.cachedFolders) {
       pos[i * 3] = -node.x;
       pos[i * 3 + 1] = node.z;
       pos[i * 3 + 2] = node.y;
-      fld[i] = node.isFile ? 0 : 1;
+      fld[i] = 1;
+      allNodes[i] = node;
+      i++;
+    }
+    for (const node of this.cachedFiles) {
+      pos[i * 3] = -node.x;
+      pos[i * 3 + 1] = node.z;
+      pos[i * 3 + 2] = node.y;
+      // fld[i] stays 0 (Float32Array default)
+      allNodes[i] = node;
+      i++;
     }
 
     const geo = new BufferGeometry();
@@ -352,8 +363,14 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       n.isFile ? toFileSize(n.fileSize ?? 0) : toFolderSize(n.subtreeBytes);
 
     const focusSet = this.selectedNode ? buildFocusSet(nodes, this.selectedNode.path) : null;
-    const { visibleFiles, visibleFolders, pathDimmedFiles, pathDimmedFolders, foldersWithContent, inDepthRange } =
-      this.computeVisibility(this.cachedFiles, this.cachedFolders);
+    const {
+      visibleFiles,
+      visibleFolders,
+      pathDimmedFiles,
+      pathDimmedFolders,
+      foldersWithContent,
+      inDepthRange,
+    } = this.computeVisibility(this.cachedFiles, this.cachedFolders);
 
     const pathDimmedSet = new Set([...pathDimmedFolders, ...pathDimmedFiles].map((n) => n.path));
     const visibleSet = new Set([...visibleFolders, ...visibleFiles].map((n) => n.path));
@@ -373,7 +390,15 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       const active = visibleSet.has(node.path) || pathDimmedSet.has(node.path);
       alp.setX(
         i,
-        !active ? 0 : focusSet ? (inFocus(node.path) ? 1.0 : DIM) : pathDimmedSet.has(node.path) ? PATH_DIM : 1.0,
+        !active
+          ? 0
+          : focusSet
+            ? inFocus(node.path)
+              ? 1.0
+              : DIM
+            : pathDimmedSet.has(node.path)
+              ? PATH_DIM
+              : 1.0,
       );
     }
 
@@ -576,7 +601,6 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       inDepthRange,
     };
   }
-
 
   private addEdges(
     folders: PositionedNode[],
