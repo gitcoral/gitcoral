@@ -5,13 +5,16 @@ export const VERT = /* glsl */ `
   attribute float aSize;
   attribute vec3  aColor;
   attribute float aIsFolder;
+  attribute float aAlpha;
   varying   vec3  vColor;
   varying   float vIsFolder;
+  varying   float vAlpha;
   uniform   float uPixelRatio;
 
   void main() {
     vColor    = aColor;
     vIsFolder = aIsFolder;
+    vAlpha    = aAlpha;
     vec4 mv      = modelViewMatrix * vec4(position, 1.0);
     gl_PointSize = aSize * uPixelRatio;
     gl_Position  = projectionMatrix * mv;
@@ -19,9 +22,9 @@ export const VERT = /* glsl */ `
 `;
 
 export const FRAG = /* glsl */ `
-  uniform float uOpacity;
   varying vec3  vColor;
   varying float vIsFolder;
+  varying float vAlpha;
 
   void main() {
     vec2  uv = gl_PointCoord - vec2(0.5);
@@ -31,7 +34,7 @@ export const FRAG = /* glsl */ `
     if (vIsFolder > 0.5) {
       // Flat 2D ring: discard inner area, output flat color
       if (r < 0.075) discard;
-      gl_FragColor = vec4(vColor, uOpacity);
+      gl_FragColor = vec4(vColor, vAlpha);
     } else {
       // Sphere impostor: reconstruct hemisphere normal from point coord
       float z      = sqrt(0.25 - r);
@@ -45,7 +48,7 @@ export const FRAG = /* glsl */ `
       float spec    = pow(max(dot(normal, halfVec), 0.0), 32.0) * 0.4;
 
       vec3 lit = vColor * (ambient + diffuse) + vec3(spec);
-      gl_FragColor = vec4(lit, uOpacity);
+      gl_FragColor = vec4(lit, vAlpha);
     }
     #include <colorspace_fragment>
   }

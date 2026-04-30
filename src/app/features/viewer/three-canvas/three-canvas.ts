@@ -93,8 +93,6 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   private controls!: OrbitControls;
   private rafId = 0;
   private resizeObserver!: ResizeObserver;
-  // Scene objects — replaced on each rebuildScene()
-  private sceneObjects: Object3D[] = [];
 
   // Selection — drives both scene focus dimming and pinned tooltip
   private selectedNode: PositionedNode | null = null;
@@ -107,6 +105,15 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
   // Track last result for which we emitted extColors
   private lastEmittedResult: LayoutResult | null = null;
+
+  // Geometry — rebuilt only when result changes
+  private cachedFiles: PositionedNode[] = [];
+  private cachedFolders: PositionedNode[] = [];
+  private nodesMesh: Points | null = null;
+  private alphaAttr: BufferAttribute | null = null;
+  private colorAttr: BufferAttribute | null = null;
+  private sizeAttr: BufferAttribute | null = null;
+  private edgeObjects: Object3D[] = [];
 
   // Drag / orbit detection
   private mouseDownX = 0;
@@ -152,7 +159,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     if (changes['result']) {
       this.selectedNode = null;
       this.hideTooltip();
-      this.rebuildScene();
+      this.buildGeometry();
       const isFirstLoad = !changes['result'].previousValue;
       if (isFirstLoad && this.cameraParam) {
         requestAnimationFrame(() => this.restoreCamera(this.cameraParam!));
@@ -160,7 +167,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
         requestAnimationFrame(() => this.fitCamera());
       }
     } else if (changes['display']) {
-      this.rebuildScene();
+      this.updateScene();
     }
   }
 
@@ -256,11 +263,11 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h, false);
-    for (const obj of this.sceneObjects) {
-      if (obj instanceof Points) {
-        const mat = obj.material as ShaderMaterial;
-        if (mat.uniforms['uPixelRatio']) mat.uniforms['uPixelRatio'].value = devicePixelRatio;
-      }
+    if (this.nodesMesh) {
+      const mat = this.nodesMesh.material as ShaderMaterial;
+      if (mat.uniforms['uPixelRatio']) mat.uniforms['uPixelRatio'].value = devicePixelRatio;
+    }
+    for (const obj of this.edgeObjects) {
       if (obj instanceof LineSegments2) {
         (obj.material as LineMaterial).resolution.set(w, h);
       }
@@ -271,60 +278,113 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   // Scene construction
   // ---------------------------------------------------------------------------
 
-  private rebuildScene(): void {
-    this.disposeScene();
+  // Full rebuild — called only when result changes.
+  private buildGeometry(): void {
+    this.disposeAll();
     if (!this.result) return;
 
     const nodes = this.result.nodes;
-    const allFiles: PositionedNode[] = [];
-    const folders: PositionedNode[] = [];
-    for (const n of nodes) (n.isFile ? allFiles : folders).push(n);
+    this.cachedFiles = [];
+    this.cachedFolders = [];
+    for (const n of nodes) (n.isFile ? this.cachedFiles : this.cachedFolders).push(n);
 
-    const focusSet = this.selectedNode ? buildFocusSet(nodes, this.selectedNode.path) : null;
-    const colorOf = this.buildColorFn(allFiles, folders, nodes);
-    const {
-      visibleFiles,
-      visibleFolders,
-      pathDimmedFiles,
-      pathDimmedFolders,
-      foldersWithContent,
-      inDepthRange,
-    } = this.computeVisibility(allFiles, folders);
+    const allNodes = [...this.cachedFolders, ...this.cachedFiles];
+    const n = allNodes.length;
+    const pos = new Float32Array(n * 3);
+    const fld = new Float32Array(n);
+    const col = new Float32Array(n * 3);
+    const siz = new Float32Array(n);
+    const alp = new Float32Array(n);
 
+    for (let i = 0; i < n; i++) {
+      const node = allNodes[i];
+      pos[i * 3] = -node.x;
+      pos[i * 3 + 1] = node.z;
+      pos[i * 3 + 2] = node.y;
+      fld[i] = node.isFile ? 0 : 1;
+    }
+
+    const geo = new BufferGeometry();
+    geo.setAttribute('position', new BufferAttribute(pos, 3));
+    geo.setAttribute('aIsFolder', new BufferAttribute(fld, 1));
+    this.colorAttr = new BufferAttribute(col, 3);
+    geo.setAttribute('aColor', this.colorAttr);
+    this.sizeAttr = new BufferAttribute(siz, 1);
+    geo.setAttribute('aSize', this.sizeAttr);
+    this.alphaAttr = new BufferAttribute(alp, 1);
+    geo.setAttribute('aAlpha', this.alphaAttr);
+    geo.userData['nodes'] = allNodes;
+
+    const mat = new ShaderMaterial({
+      vertexShader: VERT,
+      fragmentShader: FRAG,
+      uniforms: { uPixelRatio: { value: devicePixelRatio } },
+      transparent: true,
+      depthWrite: false,
+      depthFunc: LessEqualDepth,
+    });
+
+    this.nodesMesh = new Points(geo, mat);
+    this.nodesMesh.renderOrder = 0;
+    this.scene.add(this.nodesMesh);
+
+    this.updateScene();
+  }
+
+  // Attribute update — called on display/selection changes. No geometry allocation.
+  private updateScene(): void {
+    if (!this.result || !this.nodesMesh) return;
+
+    const nodes = this.result.nodes;
+    const colorOf = this.buildColorFn(this.cachedFiles, this.cachedFolders, nodes);
     const { fileDotMin, fileDotMax, folderDotMin, folderDotMax } = this.display;
     const toFileSize = makeCbrtNormalizer(
-      allFiles.map((n) => n.fileSize ?? 0),
+      this.cachedFiles.map((n) => n.fileSize ?? 0),
       fileDotMin,
       fileDotMax,
     );
     const toFolderSize = makeCbrtNormalizer(
-      folders.map((n) => n.subtreeBytes),
+      this.cachedFolders.map((n) => n.subtreeBytes),
       folderDotMin,
       folderDotMax,
     );
     const toSize = (n: PositionedNode) =>
       n.isFile ? toFileSize(n.fileSize ?? 0) : toFolderSize(n.subtreeBytes);
 
-    const allVisible = [...visibleFolders, ...visibleFiles];
-    const allPathDimmed = [...pathDimmedFolders, ...pathDimmedFiles];
-    this.pathDimmedPaths = new Set(allPathDimmed.map((n) => n.path));
+    const focusSet = this.selectedNode ? buildFocusSet(nodes, this.selectedNode.path) : null;
+    const { visibleFiles, visibleFolders, pathDimmedFiles, pathDimmedFolders, foldersWithContent, inDepthRange } =
+      this.computeVisibility(this.cachedFiles, this.cachedFolders);
+
+    const pathDimmedSet = new Set([...pathDimmedFolders, ...pathDimmedFiles].map((n) => n.path));
+    const visibleSet = new Set([...visibleFolders, ...visibleFiles].map((n) => n.path));
+    this.pathDimmedPaths = pathDimmedSet;
     const inFocus = (path: string) => !focusSet || focusSet.has(path);
 
-    if (focusSet) {
-      // Node selected: focus overrides path query — all nodes participate in focus/dim split
-      const allNodes = [...allVisible, ...allPathDimmed];
-      const focused = allNodes.filter((n) => inFocus(n.path));
-      const dimmed = allNodes.filter((n) => !inFocus(n.path));
-      if (focused.length) this.addPoints(focused, 1.0, colorOf, toSize);
-      if (dimmed.length) this.addPoints(dimmed, DIM, colorOf, toSize);
-    } else {
-      if (allVisible.length) this.addPoints(allVisible, 1.0, colorOf, toSize);
-      if (allPathDimmed.length) this.addPoints(allPathDimmed, PATH_DIM, colorOf, toSize);
+    const meshNodes = this.nodesMesh.geometry.userData['nodes'] as PositionedNode[];
+    const col = this.colorAttr!;
+    const siz = this.sizeAttr!;
+    const alp = this.alphaAttr!;
+
+    for (let i = 0; i < meshNodes.length; i++) {
+      const node = meshNodes[i];
+      const c = colorOf(node);
+      col.setXYZ(i, c.r, c.g, c.b);
+      siz.setX(i, toSize(node));
+      const active = visibleSet.has(node.path) || pathDimmedSet.has(node.path);
+      alp.setX(
+        i,
+        !active ? 0 : focusSet ? (inFocus(node.path) ? 1.0 : DIM) : pathDimmedSet.has(node.path) ? PATH_DIM : 1.0,
+      );
     }
 
+    col.needsUpdate = true;
+    siz.needsUpdate = true;
+    alp.needsUpdate = true;
+
+    this.disposeEdges();
     if (this.display.showConnectors) {
       const nodeByPath = new Map(nodes.map((n) => [n.path, n]));
-      const edgeFolders = folders.filter(
+      const edgeFolders = this.cachedFolders.filter(
         (n) => foldersWithContent.has(n.path) && inDepthRange(n.path),
       );
       const pathDimmedFolderPaths = new Set(pathDimmedFolders.map((n) => n.path));
@@ -332,17 +392,28 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     }
   }
 
-  private disposeScene(): void {
-    for (const obj of this.sceneObjects) {
+  private disposeAll(): void {
+    this.disposeEdges();
+    if (this.nodesMesh) {
+      this.scene.remove(this.nodesMesh);
+      this.nodesMesh.geometry.dispose();
+      (this.nodesMesh.material as ShaderMaterial).dispose();
+      this.nodesMesh = null;
+    }
+    this.alphaAttr = null;
+    this.colorAttr = null;
+    this.sizeAttr = null;
+  }
+
+  private disposeEdges(): void {
+    for (const obj of this.edgeObjects) {
       this.scene.remove(obj);
-      if (obj instanceof Points || obj instanceof LineSegments2) {
-        (obj as any).geometry.dispose();
-        const mat = (obj as any).material;
-        if (Array.isArray(mat)) mat.forEach((m: any) => m.dispose());
-        else mat.dispose();
+      if (obj instanceof LineSegments2) {
+        obj.geometry.dispose();
+        obj.material.dispose();
       }
     }
-    this.sceneObjects = [];
+    this.edgeObjects = [];
   }
 
   // Emits extColorsChange when the result changes (always extension-based, independent of
@@ -506,55 +577,6 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     };
   }
 
-  private addPoints(
-    subset: PositionedNode[],
-    opacity: number,
-    colorOf: (n: PositionedNode) => Color,
-    toSize: (n: PositionedNode) => number,
-  ): void {
-    const n = subset.length;
-    const pos = new Float32Array(n * 3);
-    const col = new Float32Array(n * 3);
-    const siz = new Float32Array(n);
-    const fld = new Float32Array(n);
-
-    for (let i = 0; i < n; i++) {
-      const node = subset[i];
-      pos[i * 3] = -node.x; // negate X to preserve handedness after Y↔Z swap
-      pos[i * 3 + 1] = node.z; // layout Z is the elevation axis → Three.js Y (up)
-      pos[i * 3 + 2] = node.y;
-      const c = colorOf(node);
-      col[i * 3] = c.r;
-      col[i * 3 + 1] = c.g;
-      col[i * 3 + 2] = c.b;
-      siz[i] = toSize(node);
-      fld[i] = node.isFile ? 0 : 1;
-    }
-
-    const geo = new BufferGeometry();
-    geo.setAttribute('position', new BufferAttribute(pos, 3));
-    geo.setAttribute('aColor', new BufferAttribute(col, 3));
-    geo.setAttribute('aSize', new BufferAttribute(siz, 1));
-    geo.setAttribute('aIsFolder', new BufferAttribute(fld, 1));
-    geo.userData['nodes'] = subset;
-
-    const mat = new ShaderMaterial({
-      vertexShader: VERT,
-      fragmentShader: FRAG,
-      uniforms: {
-        uOpacity: { value: opacity },
-        uPixelRatio: { value: devicePixelRatio },
-      },
-      transparent: true,
-      depthWrite: opacity >= 1,
-      depthFunc: LessEqualDepth,
-    });
-
-    const points = new Points(geo, mat);
-    points.renderOrder = 0; // draw before connectors so dots write depth first
-    this.scene.add(points);
-    this.sceneObjects.push(points);
-  }
 
   private addEdges(
     folders: PositionedNode[],
@@ -635,7 +657,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       const segs = new LineSegments2(geo, mat);
       segs.renderOrder = 1; // draw after dots; depthWrite:false lets dots show through
       this.scene.add(segs);
-      this.sceneObjects.push(segs);
+      this.edgeObjects.push(segs);
     }
   }
 
@@ -754,13 +776,16 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     let closest: { depth: number; node: PositionedNode; worldPos: Vector3 } | null = null;
     const proj = new Vector3();
 
-    for (const obj of this.sceneObjects) {
-      if (!(obj instanceof Points)) continue;
+    if (!this.nodesMesh) return null;
+    {
+      const obj = this.nodesMesh;
       const nodes = obj.geometry.userData['nodes'] as PositionedNode[];
       const posAttr = obj.geometry.getAttribute('position') as BufferAttribute;
       const sizAttr = obj.geometry.getAttribute('aSize') as BufferAttribute;
+      const alpAttr = obj.geometry.getAttribute('aAlpha') as BufferAttribute;
 
       for (let i = 0; i < nodes.length; i++) {
+        if (alpAttr.getX(i) <= 0) continue;
         if (exclude?.has(nodes[i].path)) continue;
 
         proj.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
@@ -883,6 +908,6 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       this.selectedNode = null;
       this.hideTooltip();
     }
-    if (this.result) this.rebuildScene();
+    if (this.result) this.updateScene();
   }
 }
