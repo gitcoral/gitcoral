@@ -16,7 +16,8 @@ export function simulate(weights: number[], buoy: number, repel: number): Array<
   const dt = new Float64Array(N);
   const dp = new Float64Array(N);
   const sq = new Float64Array(N); // sqrt(w/maxW) per node
-  for (let i = 0; i < N; i++) sq[i] = Math.sqrt(weights[i] / maxW);
+  const sqDenom = maxW || 1; // guard: all-zero weights would produce 0/0 = NaN
+  for (let i = 0; i < N; i++) sq[i] = Math.sqrt(weights[i] / sqDenom);
 
   const LR = 0.05;
   const MAX_STEPS = 200;
