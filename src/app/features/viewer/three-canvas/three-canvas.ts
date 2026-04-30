@@ -799,10 +799,22 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.mouseDownY = e.clientY;
   }
 
-  private showTooltip(node: PositionedNode, worldPos: Vector3): void {
+  private showTooltip(node: PositionedNode, worldPos: Vector3, isSelected = false): void {
     const hex = toHex(this.colorOf(node));
-    const line1 = document.createElement('div');
-    line1.textContent = node.path || '(root)';
+    let line1: HTMLElement;
+    if (isSelected && this.result) {
+      const type = node.isFile ? 'blob' : 'tree';
+      const link = document.createElement('a');
+      link.href = `https://github.com/${this.result.repoName}/${type}/HEAD/${node.path}`;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = node.path || '(root)';
+      link.style.cssText = 'color:#1a56db;pointer-events:auto;text-decoration:underline;';
+      line1 = link;
+    } else {
+      line1 = document.createElement('div');
+      line1.textContent = node.path || '(root)';
+    }
     this.tipEl.replaceChildren(line1);
     if (node.isFile) {
       const line2 = document.createElement('div');
@@ -810,12 +822,14 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       this.tipEl.appendChild(line2);
     }
     this.tipEl.style.background = hex;
+    this.tipEl.style.pointerEvents = 'auto';
     this.tipEl.style.display = '';
     this.tipNodePos = worldPos;
   }
 
   private hideTooltip(): void {
     this.tipEl.style.display = 'none';
+    this.tipEl.style.pointerEvents = 'none';
     this.tipNodePos = null;
   }
 
@@ -862,7 +876,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       if (isToggle) {
         this.hideTooltip();
       } else {
-        this.showTooltip(hit.node, hit.worldPos);
+        this.showTooltip(hit.node, hit.worldPos, true);
       }
     } else {
       if (!this.selectedNode) return;
