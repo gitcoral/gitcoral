@@ -31,10 +31,12 @@ export const FRAG = /* glsl */ `
     vec2  uv = gl_PointCoord - vec2(0.5);
     float r  = dot(uv, uv);
     if (r > 0.25) discard;
+    if (vIsFolder > 0.5 && r < 0.075) discard; // ring centre
+
+    // Dimmed fragments write far depth so connectors (renderOrder 1) are not occluded.
+    gl_FragDepth = vAlpha < 1.0 ? 1.0 : gl_FragCoord.z;
 
     if (vIsFolder > 0.5) {
-      // Flat 2D ring: discard inner area, output flat color
-      if (r < 0.075) discard;
       gl_FragColor = vec4(vColor, vAlpha);
     } else {
       // Sphere impostor: reconstruct hemisphere normal from point coord
