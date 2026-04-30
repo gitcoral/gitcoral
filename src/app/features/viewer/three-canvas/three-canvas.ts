@@ -331,7 +331,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       fragmentShader: FRAG,
       uniforms: { uPixelRatio: { value: devicePixelRatio } },
       transparent: true,
-      depthWrite: false,
+      depthWrite: true,
       depthFunc: LessEqualDepth,
     });
 

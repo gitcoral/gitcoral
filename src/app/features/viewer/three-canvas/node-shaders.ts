@@ -27,6 +27,7 @@ export const FRAG = /* glsl */ `
   varying float vAlpha;
 
   void main() {
+    if (vAlpha <= 0.0) discard;
     vec2  uv = gl_PointCoord - vec2(0.5);
     float r  = dot(uv, uv);
     if (r > 0.25) discard;
