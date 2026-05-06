@@ -107,7 +107,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   private tipEl!: HTMLDivElement;
   private tipNodePos: Vector3 | null = null;
   private colorOf: (n: PositionedNode) => Color = () => DEFAULT_COLOR;
-  private pathDimmedPaths: Set<string> = new Set();
+  private dimmedPaths: Set<string> = new Set();
 
   // Track last result for which we emitted extColors
   private lastEmittedResult: LayoutResult | null = null;
@@ -385,7 +385,13 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     const pathDimmedSet = new Set([...pathDimmedFolders, ...pathDimmedFiles].map((n) => n.path));
     const visibleSet = new Set([...visibleFolders, ...visibleFiles].map((n) => n.path));
-    this.pathDimmedPaths = pathDimmedSet;
+    const diffDimmedSet = this.result?.isDiff
+      ? new Set(nodes.filter((n) => n.diffStatus === 'unchanged').map((n) => n.path))
+      : new Set<string>();
+    const focusDimmedSet = focusSet
+      ? new Set(nodes.filter((n) => !focusSet.has(n.path)).map((n) => n.path))
+      : new Set<string>();
+    this.dimmedPaths = new Set([...pathDimmedSet, ...diffDimmedSet, ...focusDimmedSet]);
     const inFocus = (path: string) => !focusSet || focusSet.has(path);
 
     const meshNodes = this.nodesMesh.geometry.userData['nodes'] as PositionedNode[];
@@ -918,12 +924,12 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     if (this.isOrbiting) return;
 
     if (this.selectedNode) {
-      const hit = this.raycast(e);
+      const hit = this.raycast(e, this.dimmedPaths);
       this.canvasRef.nativeElement.style.cursor = hit ? 'pointer' : '';
       return;
     }
 
-    const hit = this.raycast(e, this.pathDimmedPaths);
+    const hit = this.raycast(e, this.dimmedPaths);
     if (hit) {
       this.showTooltip(hit.node, hit.worldPos);
       this.canvasRef.nativeElement.style.cursor = 'pointer';
@@ -949,7 +955,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const dy = e.clientY - this.mouseDownY;
     if (dx * dx + dy * dy > 16) return; // drag, not click
 
-    const hit = this.raycast(e, this.pathDimmedPaths);
+    const hit = this.raycast(e, this.dimmedPaths);
     if (hit) {
       const isToggle = this.selectedNode?.path === hit.node.path;
       this.selectedNode = isToggle ? null : hit.node;
