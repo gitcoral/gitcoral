@@ -10,13 +10,16 @@ export const VERT = /* glsl */ `
   varying   float vIsFolder;
   varying   float vAlpha;
   uniform   float uPixelRatio;
+  uniform   float uViewportH;
 
   void main() {
     vColor    = aColor;
     vIsFolder = aIsFolder;
     vAlpha    = aAlpha;
     vec4 mv      = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = aSize * uPixelRatio;
+    // aSize is in world units; project to screen pixels using perspective focal length
+    float eyeDepth = -mv.z;
+    gl_PointSize = aSize * projectionMatrix[1][1] * uViewportH * 0.5 * uPixelRatio / eyeDepth;
     gl_Position  = projectionMatrix * mv;
   }
 `;

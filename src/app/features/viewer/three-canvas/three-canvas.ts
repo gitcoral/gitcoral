@@ -57,6 +57,10 @@ const DIFF_DIM = 0.12;
 const BG = new Color(0x0c0e12);
 const EDGE_WIDTH_IN_MIN = 2;
 const EDGE_WIDTH_IN_MAX = 12;
+// Converts CSS-pixel-valued display settings to world units so nodes/connectors
+// scale naturally with camera distance. Value chosen so the default view looks
+// the same as the previous fixed-pixel rendering.
+const WORLD_SCALE = 30;
 
 // ---------------------------------------------------------------------------
 // Component
@@ -268,6 +272,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     if (this.nodesMesh) {
       const mat = this.nodesMesh.material as ShaderMaterial;
       if (mat.uniforms['uPixelRatio']) mat.uniforms['uPixelRatio'].value = devicePixelRatio;
+      if (mat.uniforms['uViewportH']) mat.uniforms['uViewportH'].value = h;
     }
     for (const obj of this.edgeObjects) {
       if (obj instanceof LineSegments2) {
@@ -328,10 +333,14 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     geo.setAttribute('aAlpha', this.alphaAttr);
     geo.userData['nodes'] = allNodes;
 
+    const canvas = this.canvasRef.nativeElement;
     const mat = new ShaderMaterial({
       vertexShader: VERT,
       fragmentShader: FRAG,
-      uniforms: { uPixelRatio: { value: devicePixelRatio } },
+      uniforms: {
+        uPixelRatio: { value: devicePixelRatio },
+        uViewportH: { value: canvas.clientHeight || 600 },
+      },
       transparent: true,
       depthWrite: true,
       depthFunc: LessEqualDepth,
@@ -388,7 +397,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       const node = meshNodes[i];
       const c = colorOf(node);
       col.setXYZ(i, c.r, c.g, c.b);
-      siz.setX(i, toSize(node));
+      siz.setX(i, toSize(node) / WORLD_SCALE);
       const active = visibleSet.has(node.path) || pathDimmedSet.has(node.path);
       const diffUnchanged = !!this.result?.isDiff && node.diffStatus === 'unchanged';
       alp.setX(
@@ -683,10 +692,10 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
         vertexColors: true,
         transparent: true,
         opacity: depthAlpha,
-        linewidth: width,
+        linewidth: width / WORLD_SCALE,
         depthWrite: false,
         resolution: new Vector2(canvas.clientWidth, canvas.clientHeight),
-        worldUnits: false,
+        worldUnits: true,
         polygonOffset: true,
         polygonOffsetFactor: 1,
         polygonOffsetUnits: 1,
@@ -808,10 +817,10 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const H = rect.height;
 
     // Screen-space hit test: project each point to CSS pixels and check radius.
-    // This is correct for billboard points whose visual size is fixed in pixels
-    // regardless of camera distance, unlike a world-space raycaster threshold.
     let closest: { depth: number; node: PositionedNode; worldPos: Vector3 } | null = null;
     const proj = new Vector3();
+    // projectionMatrix[1][1] = cot(fov/2); used to convert world size → screen pixels
+    const focalLen = this.camera.projectionMatrix.elements[5];
 
     if (!this.nodesMesh) return null;
     {
@@ -827,6 +836,9 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
         proj.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
         const worldPos = proj.clone();
+        // Eye-space depth before projecting to NDC
+        const eyeZ = proj.applyMatrix4(this.camera.matrixWorldInverse).z;
+        proj.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
         proj.project(this.camera); // → NDC
 
         if (proj.z > 1) continue; // behind near/far clip
@@ -838,8 +850,9 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
         const dx = mouseX - sx;
         const dy = mouseY - sy;
 
-        // aSize is the point diameter in CSS pixels; use a minimum hit radius so small dots remain hoverable
-        const radius = Math.max(sizAttr.getX(i) / 2, 6);
+        // aSize is in world units; convert to screen-space pixel radius for hit testing
+        const screenRadius = (sizAttr.getX(i) / 2) * focalLen * (H / 2) / -eyeZ;
+        const radius = Math.max(screenRadius, 6);
         if (dx * dx + dy * dy > radius * radius) continue;
 
         // Among overlapping points pick the one closest to camera (smallest NDC z)
