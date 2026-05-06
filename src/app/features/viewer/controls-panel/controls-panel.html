@@ -60,7 +60,7 @@
         <input
           class="repo-input"
           type="text"
-          placeholder="github.com/owner/repo"
+          placeholder="GitHub repo or PR URL"
           [(ngModel)]="repoUrl"
           (keydown.enter)="onSubmit()"
         />
@@ -135,6 +135,16 @@
               >
                 Depth
               </button>
+              @if (isDiff) {
+                <button
+                  class="color-mode-btn"
+                  [class.color-mode-btn--active]="display.colorMode === 'diff'"
+                  (click)="display.colorMode = 'diff'; onDisplayChange()"
+                  matTooltip="Color by diff status"
+                >
+                  Diff
+                </button>
+              }
             </div>
           </div>
           <div class="query-row">
@@ -155,6 +165,76 @@
       }
 
       @if (maxDepth > 0 || status !== 'idle') {
+        <!-- Branches — collapsible -->
+        <section class="section">
+          <div
+            class="section-label section-label--toggle"
+            (click)="branchesExpanded = !branchesExpanded"
+          >
+            <span>Branches</span>
+            <div class="section-label-end">
+              @if (vsRef && !branchesExpanded) {
+                <span class="diff-badge">diff</span>
+              }
+              <mat-icon class="chevron" [class.chevron--open]="branchesExpanded"
+                >chevron_right</mat-icon
+              >
+            </div>
+          </div>
+
+          @if (diffStats) {
+            <div class="diff-stats">
+              <span class="diff-stat diff-stat--added">+{{ diffStats.added }}</span>
+              <span class="diff-stat diff-stat--modified">~{{ diffStats.modified }}</span>
+              <span class="diff-stat diff-stat--deleted">-{{ diffStats.deleted }}</span>
+              <span class="diff-stat diff-stat--label">files changed</span>
+            </div>
+          }
+
+          @if (branchesExpanded) {
+            <div class="branch-row">
+              <label class="branch-label">Show</label>
+              <input
+                class="branch-input"
+                type="text"
+                placeholder="branch / tag / SHA"
+                [(ngModel)]="showRef"
+                (keydown.enter)="onBranchesApply()"
+              />
+            </div>
+            <div class="branch-row">
+              <label class="branch-label">vs</label>
+              <input
+                class="branch-input"
+                type="text"
+                placeholder="base branch (optional)"
+                [(ngModel)]="vsRef"
+                (keydown.enter)="onBranchesApply()"
+              />
+            </div>
+            <div class="branch-actions">
+              <button
+                mat-flat-button
+                class="branch-apply-btn"
+                (click)="onBranchesApply()"
+                [disabled]="status !== 'idle' || !showRef.trim()"
+              >
+                Apply
+              </button>
+              @if (vsRef) {
+                <button
+                  mat-icon-button
+                  class="label-btn"
+                  (click)="onBranchesClear()"
+                  matTooltip="Clear comparison"
+                >
+                  <mat-icon>compare_arrows</mat-icon>
+                </button>
+              }
+            </div>
+          }
+        </section>
+
         <!-- Filter — collapsible -->
         <section class="section">
           <div

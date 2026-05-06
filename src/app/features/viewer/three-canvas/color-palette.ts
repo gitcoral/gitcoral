@@ -148,3 +148,30 @@ export function buildChildrenMap(nodes: PositionedNode[]): Map<string, Positione
   }
   return map;
 }
+
+// ---------------------------------------------------------------------------
+// Diff coloring — matches GitHub's diff palette for instant recognition
+// ---------------------------------------------------------------------------
+
+const DIFF_ADDED = new Color('#3fb950');
+const DIFF_MODIFIED = new Color('#d29922');
+const DIFF_DELETED = new Color('#f85149');
+const DIFF_UNCHANGED = new Color('#484f58');
+
+export function buildDiffColorFn(
+  _nodes: PositionedNode[],
+  fallbackFn: (n: PositionedNode) => Color = () => DIFF_UNCHANGED,
+): (n: PositionedNode) => Color {
+  return (n: PositionedNode): Color => {
+    switch (n.diffStatus) {
+      case 'added':
+        return DIFF_ADDED;
+      case 'modified':
+        return DIFF_MODIFIED;
+      case 'deleted':
+        return DIFF_DELETED;
+      default:
+        return fallbackFn(n);
+    }
+  };
+}

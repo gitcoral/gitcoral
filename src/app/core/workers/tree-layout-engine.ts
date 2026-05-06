@@ -1,4 +1,9 @@
-import { LayoutParams, PositionedNode, TreeStructure } from '../../shared/models/tree-node.model';
+import {
+  DiffStatus,
+  LayoutParams,
+  PositionedNode,
+  TreeStructure,
+} from '../../shared/models/tree-node.model';
 import { simulate } from './physics-simulation';
 
 // Internal working type: TreeStructure fields + all spatial fields pre-initialised.
@@ -8,6 +13,8 @@ interface LayoutNode {
   isFile: boolean;
   fileSize?: number;
   subtreeBytes: number;
+  sha?: string;
+  diffStatus?: DiffStatus;
   children: LayoutNode[];
   x: number;
   y: number;
@@ -24,6 +31,8 @@ function toLayoutNode(src: TreeStructure): LayoutNode {
     isFile: src.isFile,
     fileSize: src.fileSize,
     subtreeBytes: src.subtreeBytes,
+    sha: src.sha,
+    diffStatus: src.diffStatus,
     children: src.children.map(toLayoutNode),
     x: 0,
     y: 0,

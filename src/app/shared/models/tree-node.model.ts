@@ -7,6 +7,8 @@ export interface TreeStructure {
   isFile: boolean;
   fileSize?: number; // bytes, files only
   subtreeBytes: number; // total bytes under this node (folders) or file size (files)
+  sha?: string; // blob SHA from GitHub API; undefined for folders
+  diffStatus?: DiffStatus; // only set in diff mode
   children: TreeStructure[];
 }
 
@@ -19,6 +21,8 @@ export interface PositionedNode {
   isFile: boolean;
   fileSize?: number;
   subtreeBytes: number; // total bytes under this node — pre-computed for renderer
+  sha?: string;
+  diffStatus?: DiffStatus;
   x: number;
   y: number;
   z: number;
@@ -28,6 +32,8 @@ export interface PositionedNode {
 // ---------------------------------------------------------------------------
 // Shared parameter / option types
 // ---------------------------------------------------------------------------
+
+export type DiffStatus = 'added' | 'modified' | 'deleted' | 'unchanged';
 
 export interface LayoutParams {
   layerHeight: number;
@@ -47,9 +53,9 @@ export const DEFAULT_LAYOUT_PARAMS: LayoutParams = {
   sphereD: 0.02,
 };
 
-export type LoadingState = 'idle' | 'fetching' | 'computing';
+export type LoadingState = 'idle' | 'fetching' | 'fetching-base' | 'computing';
 
-export type ColorMode = 'type' | 'depth' | 'size';
+export type ColorMode = 'type' | 'depth' | 'size' | 'diff';
 
 export interface DisplayOptions {
   colorMode: ColorMode;
@@ -96,12 +102,14 @@ export const DEFAULT_DISPLAY_OPTIONS: DisplayOptions = {
 export interface LayoutResult {
   nodes: PositionedNode[];
   repoName: string;
+  isDiff: boolean;
 }
 
 export interface WorkerRequest {
   root: TreeStructure;
   params: LayoutParams;
   repoName: string;
+  isDiff?: boolean;
 }
 
 export interface WorkerResponse {

@@ -5,10 +5,15 @@ interface GithubEntry {
   path: string;
   type: 'tree' | 'blob';
   size?: number;
+  sha: string;
 }
 
 interface GithubRepoMeta {
   default_branch: string;
+}
+interface GithubPR {
+  head: { sha: string; ref: string };
+  base: { sha: string; ref: string };
 }
 interface GithubCommit {
   commit: { tree: { sha: string } };
@@ -22,6 +27,7 @@ interface InternalNode {
   path: string;
   isFile: boolean;
   fileSize: number;
+  sha: string;
   children: Map<string, InternalNode>;
   subtreeBytes: number;
 }
@@ -34,17 +40,20 @@ export class GithubService {
     'User-Agent': 'gitcoral',
   };
 
-  parseRepoUrl(url: string): { owner: string; repo: string } | null {
+  parseRepoUrl(url: string): { owner: string; repo: string; prNumber?: number } | null {
     const s = url.trim().replace(/\/$/, '');
 
     // SSH: git@github.com:owner/repo.git or org-69631@github.com:owner/repo.git
     const ssh = s.match(/^[^@]+@github\.com:([^/]+)\/([^/.]+)(?:\.git)?$/);
     if (ssh) return { owner: ssh[1], repo: ssh[2] };
 
-    // HTTPS: https://github.com/owner/repo
+    // HTTPS: https://github.com/owner/repo[/pull/123]
     if (s.includes('github.com')) {
       const parsed = new URL(s.startsWith('http') ? s : `https://${s}`);
       const parts = parsed.pathname.split('/').filter(Boolean);
+      if (parts.length >= 4 && parts[2] === 'pull' && /^\d+$/.test(parts[3])) {
+        return { owner: parts[0], repo: parts[1], prNumber: parseInt(parts[3], 10) };
+      }
       if (parts.length >= 2) return { owner: parts[0], repo: parts[1].replace(/\.git$/, '') };
     }
 
@@ -53,6 +62,23 @@ export class GithubService {
     if (short) return { owner: short[1], repo: short[2] };
 
     return null;
+  }
+
+  async fetchPR(
+    owner: string,
+    repo: string,
+    prNumber: number,
+  ): Promise<{ headSha: string; baseSha: string; headRef: string; baseRef: string }> {
+    const pr = await this.get<GithubPR>(
+      `${this.BASE}/repos/${owner}/${repo}/pulls/${prNumber}`,
+      this.HEADERS,
+    );
+    return {
+      headSha: pr.head.sha,
+      baseSha: pr.base.sha,
+      headRef: pr.head.ref,
+      baseRef: pr.base.ref,
+    };
   }
 
   async fetchTree(
@@ -93,9 +119,9 @@ export class GithubService {
     const root = this.makeNode('', false);
     for (const entry of entries) {
       if (entry.type === 'tree') {
-        this.ensurePath(root, entry.path, false, 0);
+        this.ensurePath(root, entry.path, false, 0, '');
       } else if (entry.type === 'blob') {
-        this.ensurePath(root, entry.path, true, entry.size ?? 0);
+        this.ensurePath(root, entry.path, true, entry.size ?? 0, entry.sha);
       }
     }
 
@@ -139,11 +165,17 @@ export class GithubService {
     }
   }
 
-  private makeNode(path: string, isFile: boolean, fileSize = 0): InternalNode {
-    return { path, isFile, fileSize, children: new Map(), subtreeBytes: 0 };
+  private makeNode(path: string, isFile: boolean, fileSize = 0, sha = ''): InternalNode {
+    return { path, isFile, fileSize, sha, children: new Map(), subtreeBytes: 0 };
   }
 
-  private ensurePath(root: InternalNode, relPath: string, isFile: boolean, fileSize: number): void {
+  private ensurePath(
+    root: InternalNode,
+    relPath: string,
+    isFile: boolean,
+    fileSize: number,
+    sha: string,
+  ): void {
     const parts = relPath.split('/').filter(Boolean);
     let cur = root;
     for (let i = 0; i < parts.length; i++) {
@@ -151,13 +183,17 @@ export class GithubService {
       const isLast = i === parts.length - 1;
       if (!cur.children.has(part)) {
         const childPath = cur.path ? `${cur.path}/${part}` : part;
-        cur.children.set(part, this.makeNode(childPath, isLast && isFile, isLast ? fileSize : 0));
+        cur.children.set(
+          part,
+          this.makeNode(childPath, isLast && isFile, isLast ? fileSize : 0, isLast ? sha : ''),
+        );
       }
       const child = cur.children.get(part)!;
       // A path may appear as tree before its blob entry — update if needed
       if (isLast && isFile) {
         child.isFile = true;
         child.fileSize = fileSize;
+        child.sha = sha;
       }
       cur = child;
     }
@@ -201,6 +237,7 @@ export class GithubService {
         isFile: n.isFile,
         fileSize: n.isFile ? n.fileSize : undefined,
         subtreeBytes: n.subtreeBytes,
+        sha: n.isFile ? n.sha : undefined,
         children: [...n.children.values()].map((c) => built.get(c)!),
       });
     }

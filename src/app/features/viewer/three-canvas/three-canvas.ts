@@ -41,6 +41,7 @@ import {
   buildExtColorMap,
   buildExtColorFn,
   buildDepthColorFn,
+  buildDiffColorFn,
   buildFileSizeColorFn,
   toHex,
 } from './color-palette';
@@ -52,6 +53,7 @@ import { buildFocusSet, fileExt, hashPath, makeCbrtNormalizer, parentPath } from
 
 const DIM = 0.08;
 const PATH_DIM = 0.08;
+const DIFF_DIM = 0.12;
 const BG = new Color(0x0c0e12);
 const EDGE_WIDTH_IN_MIN = 2;
 const EDGE_WIDTH_IN_MAX = 12;
@@ -388,17 +390,22 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       col.setXYZ(i, c.r, c.g, c.b);
       siz.setX(i, toSize(node));
       const active = visibleSet.has(node.path) || pathDimmedSet.has(node.path);
+      const diffUnchanged = !!this.result?.isDiff && node.diffStatus === 'unchanged';
       alp.setX(
         i,
         !active
           ? 0
           : focusSet
             ? inFocus(node.path)
-              ? 1.0
+              ? diffUnchanged
+                ? DIFF_DIM
+                : 1.0
               : DIM
             : pathDimmedSet.has(node.path)
               ? PATH_DIM
-              : 1.0,
+              : diffUnchanged
+                ? DIFF_DIM
+                : 1.0,
       );
     }
 
@@ -485,6 +492,9 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
         break;
       case 'size':
         this.colorOf = buildFileSizeColorFn(nodes);
+        break;
+      case 'diff':
+        this.colorOf = buildDiffColorFn(nodes);
         break;
       default:
         this.colorOf = buildExtColorFn(allFiles, folders, nodes);
@@ -631,6 +641,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       const c = new Color(`hsl(${hue},20%,60%)`);
       const focused = inFocus(node.path) && inFocus(pp);
       const pathDimmed = isPathDim(node.path) || isPathDim(pp);
+      const diffUnchanged = !!this.result?.isDiff && node.diffStatus === 'unchanged';
       const depthBucket = Math.min(
         Math.floor(((node.z - zMin) / zRange) * DEPTH_BUCKETS),
         DEPTH_BUCKETS - 1,
@@ -639,8 +650,10 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       const depthAlpha = focused
         ? pathDimmed
           ? PATH_DIM
-          : connectorOpacityMax -
-            (connectorOpacityMax - connectorOpacityMin) * (depthBucket / (DEPTH_BUCKETS - 1))
+          : diffUnchanged
+            ? DIFF_DIM
+            : connectorOpacityMax -
+              (connectorOpacityMax - connectorOpacityMin) * (depthBucket / (DEPTH_BUCKETS - 1))
         : DIM;
       const t = Math.max(
         0,
@@ -653,7 +666,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
         this.display.connectorWidthMin +
         (this.display.connectorWidthMax - this.display.connectorWidthMin) * t;
       const wBucket = Math.round(scaledW * 2) / 2;
-      const key = `${focused ? 1 : 0}-${pathDimmed ? 1 : 0}-${depthBucket}-${wBucket}`;
+      const key = `${focused ? 1 : 0}-${pathDimmed ? 1 : 0}-${diffUnchanged ? 1 : 0}-${depthBucket}-${wBucket}`;
 
       if (!batches.has(key)) batches.set(key, { pos: [], col: [], depthAlpha, width: scaledW });
       const b = batches.get(key)!;
@@ -869,6 +882,11 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       const line2 = document.createElement('div');
       line2.textContent = `${(node.fileSize ?? 0).toLocaleString()} bytes`;
       this.tipEl.appendChild(line2);
+    }
+    if (node.diffStatus) {
+      const diffLine = document.createElement('div');
+      diffLine.textContent = node.diffStatus;
+      this.tipEl.appendChild(diffLine);
     }
     this.tipEl.style.background = hex;
     this.tipEl.style.pointerEvents = 'auto';

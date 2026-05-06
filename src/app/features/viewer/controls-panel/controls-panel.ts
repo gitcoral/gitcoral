@@ -31,6 +31,11 @@ export interface RepoSubmitEvent {
   url: string;
 }
 
+export interface BranchesEvent {
+  show: string;
+  vs: string;
+}
+
 @Component({
   selector: 'app-controls-panel',
   imports: [
@@ -54,6 +59,10 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   @Input() maxDepth = 0;
   @Input() extColors: { ext: string; label: string; color: string; count: number }[] = [];
   @Input() autoOrbit = false;
+  @Input() initialShow = '';
+  @Input() initialVs = '';
+  @Input() isDiff = false;
+  @Input() diffStats: { added: number; modified: number; deleted: number } | null = null;
   @Output() repoSubmit = new EventEmitter<RepoSubmitEvent>();
   @Output() autoOrbitToggle = new EventEmitter<void>();
   @Output() paramsChange = new EventEmitter<LayoutParams>();
@@ -61,6 +70,7 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   @Output() snapshotRequest = new EventEmitter<void>();
   @Output() cameraResetRequest = new EventEmitter<void>();
   @Output() homeRequest = new EventEmitter<void>();
+  @Output() branchesChange = new EventEmitter<BranchesEvent>();
 
   repoUrl = '';
   params: LayoutParams = { ...DEFAULT_LAYOUT_PARAMS };
@@ -70,6 +80,9 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   displayExpanded = false;
   layoutExpanded = false;
   extExpanded = false;
+  branchesExpanded = false;
+  showRef = '';
+  vsRef = '';
 
   readonly EXT_LIMIT = 12;
   readonly gitHash = GIT_HASH;
@@ -171,6 +184,12 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
     if (changes['initialColorMode'] && this.initialColorMode !== 'type') {
       this.display.colorMode = this.initialColorMode;
     }
+    if (changes['initialShow'] && this.initialShow) {
+      this.showRef = this.initialShow;
+    }
+    if (changes['initialVs'] && this.initialVs) {
+      this.vsRef = this.initialVs;
+    }
     if (changes['maxFileSize'] && this.maxFileSize > 0) {
       this.fileSizePosMin = 0;
       this.fileSizePosMax = 1000;
@@ -183,15 +202,25 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
       this.display.depthMax = this.maxDepth;
       this.displayChange.emit({ ...this.display });
     }
+    if (changes['isDiff']) {
+      if (this.isDiff) {
+        this.display.colorMode = 'diff';
+      } else if (this.display.colorMode === 'diff') {
+        this.display.colorMode = 'type';
+      }
+      this.displayChange.emit({ ...this.display });
+    }
     if (
       changes['repoName'] &&
       !changes['repoName'].firstChange &&
       changes['repoName'].previousValue
     ) {
-      // User switched repos — reset hidden extensions, path query, and collapsed state
+      // User switched repos — reset hidden extensions, path query, branches, and collapsed state
       this.display.hiddenExtensions = [];
       this.display.pathQuery = '';
       this.extExpanded = false;
+      this.showRef = '';
+      this.vsRef = '';
       this.displayChange.emit({ ...this.display });
     }
   }
@@ -342,6 +371,15 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
     if (pos <= 0) return 0;
     if (pos >= 1000) return this.maxFileSize;
     return Math.round(Math.exp((pos / 1000) * Math.log(this.maxFileSize + 1)) - 1);
+  }
+
+  onBranchesApply(): void {
+    this.branchesChange.emit({ show: this.showRef.trim(), vs: this.vsRef.trim() });
+  }
+
+  onBranchesClear(): void {
+    this.vsRef = '';
+    this.onBranchesApply();
   }
 
   toggleCollapse(): void {

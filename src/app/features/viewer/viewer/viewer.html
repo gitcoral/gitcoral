@@ -19,6 +19,10 @@
       [initialRepo]="initialRepo"
       [initialQuery]="initialQuery"
       [initialColorMode]="initialColorMode"
+      [initialShow]="initialShow"
+      [initialVs]="initialVs"
+      [isDiff]="isDiff"
+      [diffStats]="diffStats"
       [repoName]="repoName"
       [maxFileSize]="maxFileSize"
       [maxDepth]="maxDepth"
@@ -31,6 +35,7 @@
       (snapshotRequest)="onSnapshot()"
       (cameraResetRequest)="onCameraReset()"
       (homeRequest)="onHome()"
+      (branchesChange)="onBranchesChange($event)"
     />
   </aside>
 

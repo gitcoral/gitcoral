@@ -9,12 +9,13 @@ addEventListener('message', ({ data }: MessageEvent<WorkerRequest>) => {
       result: {
         nodes: layoutTree(data.root, data.params),
         repoName: data.repoName,
+        isDiff: data.isDiff ?? false,
       },
     };
     postMessage(response);
   } catch (e) {
     const response: WorkerResponse = {
-      result: { nodes: [], repoName: data.repoName },
+      result: { nodes: [], repoName: data.repoName, isDiff: false },
       error: e instanceof Error ? e.message : String(e),
     };
     postMessage(response);

@@ -502,3 +502,77 @@ mat-slider {
   font-variant-numeric: tabular-nums;
   opacity: 0.6;
 }
+
+// ---------------------------------------------------------------------------
+// Branches section
+// ---------------------------------------------------------------------------
+
+.branch-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.branch-label {
+  font-size: 11px;
+  color: $text-dim;
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.branch-input {
+  @include text-input;
+  flex: 1;
+  min-width: 0;
+}
+
+.branch-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.branch-apply-btn {
+  flex: 1;
+}
+
+.diff-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 2px;
+}
+
+.diff-stat {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+
+  &--added {
+    color: #3fb950;
+  }
+  &--modified {
+    color: #d29922;
+  }
+  &--deleted {
+    color: #f85149;
+  }
+  &--label {
+    font-size: 11px;
+    font-weight: 400;
+    color: $text-dim;
+  }
+}
+
+.diff-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #d29922;
+  background: rgba(210, 153, 34, 0.15);
+  border-radius: 3px;
+  padding: 1px 5px;
+}

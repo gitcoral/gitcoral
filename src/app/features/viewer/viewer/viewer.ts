@@ -17,12 +17,13 @@ import {
   ColorMode,
   DEFAULT_DISPLAY_OPTIONS,
   DEFAULT_LAYOUT_PARAMS,
+  DiffStatus,
   DisplayOptions,
   LayoutParams,
   LoadingState,
   TreeStructure,
 } from '../../../shared/models/tree-node.model';
-import { ControlsPanel, RepoSubmitEvent } from '../controls-panel/controls-panel';
+import { BranchesEvent, ControlsPanel, RepoSubmitEvent } from '../controls-panel/controls-panel';
 import { ThreeCanvas } from '../three-canvas/three-canvas';
 
 @Component({
@@ -43,6 +44,10 @@ export class Viewer implements OnInit {
   cameraParam: string | null = null;
   initialQuery = '';
   initialColorMode: ColorMode = 'type';
+  initialShow = '';
+  initialVs = '';
+  showRef = '';
+  vsRef = '';
 
   get result() {
     return this.layout.result;
@@ -63,9 +68,27 @@ export class Viewer implements OnInit {
     return Math.max(0, ...nodes.map((n) => (n.path === '' ? 0 : n.path.split('/').length)));
   }
 
+  get isDiff(): boolean {
+    return this.layout.result()?.isDiff ?? false;
+  }
+
+  get diffStats(): { added: number; modified: number; deleted: number } | null {
+    const result = this.layout.result();
+    if (!result?.isDiff) return null;
+    const files = result.nodes.filter((n) => n.isFile);
+    return {
+      added: files.filter((n) => n.diffStatus === 'added').length,
+      modified: files.filter((n) => n.diffStatus === 'modified').length,
+      deleted: files.filter((n) => n.diffStatus === 'deleted').length,
+    };
+  }
+
   private rawRoot: TreeStructure | null = null;
   repoName = '';
   headBranch = '';
+  private currentOwner = '';
+  private currentRepo = '';
+  private isDiffMode = false;
   private params: LayoutParams = { ...DEFAULT_LAYOUT_PARAMS };
   private destroyRef = inject(DestroyRef);
 
@@ -84,9 +107,6 @@ export class Viewer implements OnInit {
   }
 
   ngOnInit(): void {
-    // React to route param changes — covers initial load and browser back/forward.
-    // In ngOnInit (not constructor) so the view renders 'idle' before 'fetching' is set,
-    // ensuring "Fetching…" is always visible on initial URL load.
     this.route.params.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const { owner, repo } = params;
       if (owner && repo) {
@@ -94,20 +114,24 @@ export class Viewer implements OnInit {
         this.cameraParam = this.route.snapshot.queryParams['cam'] ?? null;
         const q = this.route.snapshot.queryParams['q'] ?? '';
         const color = this.route.snapshot.queryParams['color'] ?? '';
+        const show = this.route.snapshot.queryParams['show'] ?? '';
+        const vs = this.route.snapshot.queryParams['vs'] ?? '';
         this.initialQuery = q;
         this.initialColorMode = (['type', 'depth', 'size'] as ColorMode[]).includes(
           color as ColorMode,
         )
           ? (color as ColorMode)
           : 'type';
+        this.initialShow = show;
+        this.initialVs = vs;
+        this.showRef = show;
+        this.vsRef = vs;
         this.display = {
           ...DEFAULT_DISPLAY_OPTIONS,
           pathQuery: q,
           colorMode: this.initialColorMode,
         };
-        // Defer to next macrotask so Angular completes its initial render (status='idle')
-        // before loadRepo sets status='fetching' — otherwise the fetching state is skipped.
-        setTimeout(() => this.loadRepo(owner, repo));
+        setTimeout(() => this.loadBranches(owner, repo, show, vs));
       }
     });
   }
@@ -120,18 +144,79 @@ export class Viewer implements OnInit {
       return;
     }
 
+    this.showRef = '';
+    this.vsRef = '';
     this.cameraParam = null;
     this.router.navigate([parsed.owner, parsed.repo], { replaceUrl: false });
-    await this.loadRepo(parsed.owner, parsed.repo);
+
+    if (parsed.prNumber) {
+      this.status.set('fetching');
+      try {
+        const pr = await this.github.fetchPR(parsed.owner, parsed.repo, parsed.prNumber);
+        this.showRef = pr.headRef;
+        this.vsRef = pr.baseRef;
+        this.initialShow = pr.headRef;
+        this.initialVs = pr.baseRef;
+        await this.loadBranches(parsed.owner, parsed.repo, pr.headSha, pr.baseSha);
+      } catch (e) {
+        this.layout.error.set(e instanceof Error ? e.message : String(e));
+        this.status.set('idle');
+      }
+    } else {
+      await this.loadBranches(parsed.owner, parsed.repo, '', '');
+    }
   }
 
-  private async loadRepo(owner: string, repo: string, ref?: string): Promise<void> {
+  async onBranchesChange(event: BranchesEvent): Promise<void> {
+    this.showRef = event.show;
+    this.vsRef = event.vs;
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        show: event.show || null,
+        vs: event.vs || null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+    await this.loadBranches(this.currentOwner, this.currentRepo, event.show, event.vs);
+  }
+
+  private async loadBranches(
+    owner: string,
+    repo: string,
+    showRef: string,
+    vsRef: string,
+  ): Promise<void> {
+    this.currentOwner = owner;
+    this.currentRepo = repo;
     this.status.set('fetching');
     try {
-      const { tree, ref: resolvedRef } = await this.github.fetchTree(owner, repo, ref);
-      this.rawRoot = tree;
-      this.headBranch = resolvedRef;
+      const { tree: headTree, ref: resolvedShow } = await this.github.fetchTree(
+        owner,
+        repo,
+        showRef || undefined,
+      );
+      this.headBranch = resolvedShow;
       this.repoName = `${owner}/${repo}`;
+
+      if (vsRef.trim()) {
+        this.status.set('fetching-base');
+        const { tree: baseTree } = await this.github.fetchTree(owner, repo, vsRef);
+        this.rawRoot = this.computeDiff(headTree, baseTree);
+        this.isDiffMode = true;
+      } else {
+        this.rawRoot = headTree;
+        this.isDiffMode = false;
+      }
+
+      // Sync color mode with diff state
+      if (this.isDiffMode) {
+        this.display = { ...this.display, colorMode: 'diff' };
+      } else if (this.display.colorMode === 'diff') {
+        this.display = { ...this.display, colorMode: 'type' };
+      }
+
       this.resetCamera = true;
       this.scheduleLayout();
     } catch (e) {
@@ -139,6 +224,137 @@ export class Viewer implements OnInit {
       this.status.set('idle');
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Diff computation
+  // ---------------------------------------------------------------------------
+
+  private computeDiff(head: TreeStructure, base: TreeStructure): TreeStructure {
+    // Step 1: flatten both trees to path → node maps
+    const headMap = new Map<string, TreeStructure>();
+    const baseMap = new Map<string, TreeStructure>();
+    this.flattenTree(head, headMap);
+    this.flattenTree(base, baseMap);
+
+    // Step 2: determine per-path diff status
+    const statusMap = new Map<string, DiffStatus>();
+    for (const [path, node] of headMap) {
+      const baseNode = baseMap.get(path);
+      if (!baseNode) {
+        statusMap.set(path, 'added');
+      } else if (node.sha && baseNode.sha && node.sha === baseNode.sha) {
+        statusMap.set(path, 'unchanged');
+      } else {
+        statusMap.set(path, 'modified');
+      }
+    }
+    for (const path of baseMap.keys()) {
+      if (!headMap.has(path)) statusMap.set(path, 'deleted');
+    }
+
+    // Step 3: build merged tree starting from head, inserting deleted nodes
+    const merged = this.cloneWithStatus(head, statusMap);
+
+    // Insert deleted nodes from base (including their ancestor folders)
+    for (const [path, baseNode] of baseMap) {
+      if (statusMap.get(path) === 'deleted') {
+        this.insertDeletedNode(merged, path, baseNode, baseMap, statusMap);
+      }
+    }
+
+    // Step 4: bottom-up pass — propagate diff status to folders, recompute subtreeBytes
+    this.propagateFolderStatus(merged);
+
+    return merged;
+  }
+
+  private flattenTree(node: TreeStructure, map: Map<string, TreeStructure>): void {
+    if (node.path !== '') map.set(node.path, node);
+    for (const child of node.children) this.flattenTree(child, map);
+  }
+
+  private cloneWithStatus(node: TreeStructure, statusMap: Map<string, DiffStatus>): TreeStructure {
+    return {
+      ...node,
+      diffStatus: statusMap.get(node.path),
+      children: node.children.map((c) => this.cloneWithStatus(c, statusMap)),
+    };
+  }
+
+  private insertDeletedNode(
+    mergedRoot: TreeStructure,
+    path: string,
+    baseNode: TreeStructure,
+    baseMap: Map<string, TreeStructure>,
+    statusMap: Map<string, DiffStatus>,
+  ): void {
+    const parts = path.split('/');
+    let cur = mergedRoot;
+
+    // Walk/create ancestor folders
+    for (let i = 0; i < parts.length - 1; i++) {
+      const folderPath = parts.slice(0, i + 1).join('/');
+      let child = cur.children.find((c) => c.path === folderPath);
+      if (!child) {
+        const baseFolder = baseMap.get(folderPath);
+        child = {
+          path: folderPath,
+          isFile: false,
+          subtreeBytes: baseFolder?.subtreeBytes ?? 0,
+          diffStatus: 'deleted',
+          children: [],
+        };
+        cur.children.push(child);
+        statusMap.set(folderPath, 'deleted');
+      }
+      cur = child;
+    }
+
+    // Insert the deleted leaf if not already present
+    const alreadyPresent = cur.children.some((c) => c.path === path);
+    if (!alreadyPresent) {
+      cur.children.push({
+        path: baseNode.path,
+        isFile: baseNode.isFile,
+        fileSize: baseNode.fileSize,
+        subtreeBytes: baseNode.subtreeBytes,
+        sha: baseNode.sha,
+        diffStatus: 'deleted',
+        children: baseNode.isFile ? [] : this.cloneDeletedSubtree(baseNode, statusMap),
+      });
+    }
+  }
+
+  private cloneDeletedSubtree(
+    node: TreeStructure,
+    statusMap: Map<string, DiffStatus>,
+  ): TreeStructure[] {
+    return node.children.map((c) => {
+      statusMap.set(c.path, 'deleted');
+      return {
+        ...c,
+        diffStatus: 'deleted' as DiffStatus,
+        children: this.cloneDeletedSubtree(c, statusMap),
+      };
+    });
+  }
+
+  private propagateFolderStatus(node: TreeStructure): void {
+    if (node.isFile) return;
+    for (const child of node.children) this.propagateFolderStatus(child);
+
+    // Recompute subtreeBytes
+    node.subtreeBytes = node.children.reduce((s, c) => s + c.subtreeBytes, 0);
+
+    // Propagate diff status upward
+    if (node.diffStatus !== 'deleted' && node.diffStatus !== 'added') {
+      const hasChange = node.children.some((c) => c.diffStatus !== 'unchanged');
+      if (hasChange) node.diffStatus = 'modified';
+      else node.diffStatus = 'unchanged';
+    }
+  }
+
+  // ---------------------------------------------------------------------------
 
   onDisplayChange(display: DisplayOptions): void {
     this.display = display;
@@ -180,8 +396,14 @@ export class Viewer implements OnInit {
   onHome(): void {
     this.rawRoot = null;
     this.repoName = '';
+    this.headBranch = '';
     this.initialRepo = '';
     this.extColors = [];
+    this.showRef = '';
+    this.vsRef = '';
+    this.isDiffMode = false;
+    this.currentOwner = '';
+    this.currentRepo = '';
     this.layout.result.set(null);
     this.layout.error.set(null);
     this.router.navigate(['']);
@@ -198,6 +420,6 @@ export class Viewer implements OnInit {
   private scheduleLayout(): void {
     if (!this.rawRoot) return;
     this.status.set('computing');
-    this.layout.schedule(this.rawRoot, this.params, this.repoName);
+    this.layout.schedule(this.rawRoot, this.params, this.repoName, this.isDiffMode);
   }
 }
