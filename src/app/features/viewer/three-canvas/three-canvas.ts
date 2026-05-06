@@ -60,7 +60,7 @@ const EDGE_WIDTH_IN_MAX = 12;
 // Converts CSS-pixel-valued display settings to world units so nodes/connectors
 // scale naturally with camera distance. Value chosen so the default view looks
 // the same as the previous fixed-pixel rendering.
-const WORLD_SCALE = 30;
+const WORLD_SCALE = 100;
 
 // ---------------------------------------------------------------------------
 // Component
