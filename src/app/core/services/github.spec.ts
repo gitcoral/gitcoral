@@ -1,4 +1,3 @@
-import { TestBed } from '@angular/core/testing';
 import { describe, beforeEach, it, expect } from 'vitest';
 import { GithubService } from './github';
 
@@ -6,8 +5,7 @@ describe('GithubService', () => {
   let service: GithubService;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
-    service = TestBed.inject(GithubService);
+    service = new GithubService();
   });
 
   // -------------------------------------------------------------------------

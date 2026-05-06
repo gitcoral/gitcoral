@@ -55,31 +55,41 @@ export class GithubService {
     return null;
   }
 
-  async fetchTree(owner: string, repo: string, token?: string): Promise<TreeStructure> {
-    const headers = token
-      ? { ...this.HEADERS, Authorization: `Bearer ${token}` }
-      : { ...this.HEADERS };
+  async fetchTree(
+    owner: string,
+    repo: string,
+    ref?: string,
+  ): Promise<{ tree: TreeStructure; ref: string }> {
+    let resolvedRef: string;
 
-    // Step 1: get default branch
-    const meta = await this.get<GithubRepoMeta>(`${this.BASE}/repos/${owner}/${repo}`, headers);
-    const branch = meta.default_branch ?? 'main';
+    if (ref) {
+      resolvedRef = ref;
+    } else {
+      // Fetch default branch only when no ref is specified
+      const meta = await this.get<GithubRepoMeta>(
+        `${this.BASE}/repos/${owner}/${repo}`,
+        this.HEADERS,
+      );
+      if (!meta.default_branch) throw new Error('Could not determine default branch');
+      resolvedRef = meta.default_branch;
+    }
 
-    // Step 2: get HEAD commit tree SHA
+    // Get commit tree SHA for the resolved ref
     const commit = await this.get<GithubCommit>(
-      `${this.BASE}/repos/${owner}/${repo}/commits/${encodeURIComponent(branch)}`,
-      headers,
+      `${this.BASE}/repos/${owner}/${repo}/commits/${encodeURIComponent(resolvedRef)}`,
+      this.HEADERS,
     );
     const treeSha = commit.commit.tree.sha;
     if (!treeSha) throw new Error('Could not resolve tree SHA');
 
-    // Step 3: fetch full recursive tree
+    // Fetch full recursive tree
     const treeData = await this.get<GithubTreeResult>(
       `${this.BASE}/repos/${owner}/${repo}/git/trees/${treeSha}?recursive=1`,
-      headers,
+      this.HEADERS,
     );
     const entries = treeData.tree ?? [];
 
-    // Step 4: build internal tree structure
+    // Build internal tree structure
     const root = this.makeNode('', false);
     for (const entry of entries) {
       if (entry.type === 'tree') {
@@ -89,11 +99,8 @@ export class GithubService {
       }
     }
 
-    // Step 5: compute subtree file counts and byte totals bottom-up
     this.computeSubtreeStats(root);
-
-    // Step 6: flatten to TreeNode (xyz/nodeSize/connectionWidth set to 0 — layout fills them)
-    return this.toTreeNode(root);
+    return { tree: this.toTreeNode(root), ref: resolvedRef };
   }
 
   // -------------------------------------------------------------------------

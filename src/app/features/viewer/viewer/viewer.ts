@@ -65,6 +65,7 @@ export class Viewer implements OnInit {
 
   private rawRoot: TreeStructure | null = null;
   repoName = '';
+  headBranch = '';
   private params: LayoutParams = { ...DEFAULT_LAYOUT_PARAMS };
   private destroyRef = inject(DestroyRef);
 
@@ -124,10 +125,12 @@ export class Viewer implements OnInit {
     await this.loadRepo(parsed.owner, parsed.repo);
   }
 
-  private async loadRepo(owner: string, repo: string): Promise<void> {
+  private async loadRepo(owner: string, repo: string, ref?: string): Promise<void> {
     this.status.set('fetching');
     try {
-      this.rawRoot = await this.github.fetchTree(owner, repo);
+      const { tree, ref: resolvedRef } = await this.github.fetchTree(owner, repo, ref);
+      this.rawRoot = tree;
+      this.headBranch = resolvedRef;
       this.repoName = `${owner}/${repo}`;
       this.resetCamera = true;
       this.scheduleLayout();
