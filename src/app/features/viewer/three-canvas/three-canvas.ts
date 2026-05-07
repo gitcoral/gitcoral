@@ -857,7 +857,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
         const dy = mouseY - sy;
 
         // aSize is in world units; convert to screen-space pixel radius for hit testing
-        const screenRadius = (sizAttr.getX(i) / 2) * focalLen * (H / 2) / -eyeZ;
+        const screenRadius = ((sizAttr.getX(i) / 2) * focalLen * (H / 2)) / -eyeZ;
         const radius = Math.max(screenRadius, 6);
         if (dx * dx + dy * dy > radius * radius) continue;
 
