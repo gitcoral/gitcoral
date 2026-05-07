@@ -146,23 +146,30 @@ export class Viewer implements OnInit {
 
     this.showRef = '';
     this.vsRef = '';
+    this.initialShow = '';
+    this.initialVs = '';
+    this.repoName = '';
     this.cameraParam = null;
-    this.router.navigate([parsed.owner, parsed.repo], { replaceUrl: false });
 
     if (parsed.prNumber) {
       this.status.set('fetching');
       try {
         const pr = await this.github.fetchPR(parsed.owner, parsed.repo, parsed.prNumber);
-        this.showRef = pr.headRef;
-        this.vsRef = pr.baseRef;
-        this.initialShow = pr.headRef;
-        this.initialVs = pr.baseRef;
+        this.showRef = pr.headSha;
+        this.vsRef = pr.baseSha;
+        this.initialShow = pr.headSha;
+        this.initialVs = pr.baseSha;
+        this.router.navigate([parsed.owner, parsed.repo], {
+          replaceUrl: false,
+          queryParams: { show: pr.headSha, vs: pr.baseSha },
+        });
         await this.loadBranches(parsed.owner, parsed.repo, pr.headSha, pr.baseSha);
       } catch (e) {
         this.layout.error.set(e instanceof Error ? e.message : String(e));
         this.status.set('idle');
       }
     } else {
+      this.router.navigate([parsed.owner, parsed.repo], { replaceUrl: false });
       await this.loadBranches(parsed.owner, parsed.repo, '', '');
     }
   }

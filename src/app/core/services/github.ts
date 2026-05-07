@@ -100,12 +100,23 @@ export class GithubService {
       resolvedRef = meta.default_branch;
     }
 
-    // Get commit tree SHA for the resolved ref
-    const commit = await this.get<GithubCommit>(
-      `${this.BASE}/repos/${owner}/${repo}/commits/${encodeURIComponent(resolvedRef)}`,
-      this.HEADERS,
-    );
-    const treeSha = commit.commit.tree.sha;
+    // Get commit tree SHA for the resolved ref.
+    // Commit SHAs are safe as path segments; branch names with slashes must use ?sha= query param.
+    let treeSha: string;
+    if (/^[0-9a-f]{40}$/i.test(resolvedRef)) {
+      const commit = await this.get<GithubCommit>(
+        `${this.BASE}/repos/${owner}/${repo}/commits/${resolvedRef}`,
+        this.HEADERS,
+      );
+      treeSha = commit.commit.tree.sha;
+    } else {
+      const commits = await this.get<GithubCommit[]>(
+        `${this.BASE}/repos/${owner}/${repo}/commits?sha=${encodeURIComponent(resolvedRef)}&per_page=1`,
+        this.HEADERS,
+      );
+      if (!commits.length) throw new Error('Could not resolve branch to a commit');
+      treeSha = commits[0].commit.tree.sha;
+    }
     if (!treeSha) throw new Error('Could not resolve tree SHA');
 
     // Fetch full recursive tree

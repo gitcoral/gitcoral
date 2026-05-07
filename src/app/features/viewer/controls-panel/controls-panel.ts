@@ -178,16 +178,19 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
     if (changes['initialRepo'] && this.initialRepo && !this.repoUrl) {
       this.repoUrl = this.initialRepo;
     }
+    if (changes['repoName'] && this.repoName) {
+      this.repoUrl = this.repoName;
+    }
     if (changes['initialQuery'] && this.initialQuery) {
       this.display.pathQuery = this.initialQuery;
     }
     if (changes['initialColorMode'] && this.initialColorMode !== 'type') {
       this.display.colorMode = this.initialColorMode;
     }
-    if (changes['initialShow'] && this.initialShow) {
+    if (changes['initialShow']) {
       this.showRef = this.initialShow;
     }
-    if (changes['initialVs'] && this.initialVs) {
+    if (changes['initialVs']) {
       this.vsRef = this.initialVs;
     }
     if (changes['maxFileSize'] && this.maxFileSize > 0) {
@@ -205,6 +208,7 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
     if (changes['isDiff']) {
       if (this.isDiff) {
         this.display.colorMode = 'diff';
+        this.branchesExpanded = true;
       } else if (this.display.colorMode === 'diff') {
         this.display.colorMode = 'type';
       }
@@ -219,8 +223,8 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
       this.display.hiddenExtensions = [];
       this.display.pathQuery = '';
       this.extExpanded = false;
-      this.showRef = '';
-      this.vsRef = '';
+      this.showRef = this.initialShow;
+      this.vsRef = this.initialVs;
       this.displayChange.emit({ ...this.display });
     }
   }
@@ -378,6 +382,7 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   }
 
   onBranchesClear(): void {
+    this.showRef = '';
     this.vsRef = '';
     this.onBranchesApply();
   }
