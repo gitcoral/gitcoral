@@ -143,7 +143,15 @@ export class Viewer implements OnInit {
               this.initialVs = prData.baseRef;
               this.showRef = prData.headRef;
               this.vsRef = prData.baseRef;
-              await this.loadBranches(owner, repo, prData.headSha, prData.baseSha, prData.headRef, prData.baseRef, prData.headRepoName);
+              await this.loadBranches(
+                owner,
+                repo,
+                prData.headSha,
+                prData.baseSha,
+                prData.headRef,
+                prData.baseRef,
+                prData.headRepoName,
+              );
             } catch (e) {
               this.layout.error.set(e instanceof Error ? e.message : String(e));
               this.status.set('idle');
@@ -188,7 +196,15 @@ export class Viewer implements OnInit {
           replaceUrl: false,
           queryParams: { pr: parsed.prNumber },
         });
-        await this.loadBranches(parsed.owner, parsed.repo, pr.headSha, pr.baseSha, pr.headRef, pr.baseRef, pr.headRepoName);
+        await this.loadBranches(
+          parsed.owner,
+          parsed.repo,
+          pr.headSha,
+          pr.baseSha,
+          pr.headRef,
+          pr.baseRef,
+          pr.headRepoName,
+        );
       } catch (e) {
         this.layout.error.set(e instanceof Error ? e.message : String(e));
         this.status.set('idle');
@@ -462,6 +478,15 @@ export class Viewer implements OnInit {
   private scheduleLayout(): void {
     if (!this.rawRoot) return;
     this.status.set('computing');
-    this.layout.schedule(this.rawRoot, this.params, this.repoName, this.headRepoName, this.headBranch, this.vsLinkRef, this.isDiffMode, this.prNumber);
+    this.layout.schedule(
+      this.rawRoot,
+      this.params,
+      this.repoName,
+      this.headRepoName,
+      this.headBranch,
+      this.vsLinkRef,
+      this.isDiffMode,
+      this.prNumber,
+    );
   }
 }

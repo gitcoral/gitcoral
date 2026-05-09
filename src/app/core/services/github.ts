@@ -68,7 +68,13 @@ export class GithubService {
     owner: string,
     repo: string,
     prNumber: number,
-  ): Promise<{ headSha: string; baseSha: string; headRef: string; baseRef: string; headRepoName: string }> {
+  ): Promise<{
+    headSha: string;
+    baseSha: string;
+    headRef: string;
+    baseRef: string;
+    headRepoName: string;
+  }> {
     const pr = await this.get<GithubPR>(
       `${this.BASE}/repos/${owner}/${repo}/pulls/${prNumber}`,
       this.HEADERS,

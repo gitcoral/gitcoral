@@ -896,17 +896,21 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
         if (node.isFile) {
           const bytes = new TextEncoder().encode(node.path);
           crypto.subtle.digest('SHA-256', bytes).then((buf) => {
-            const hex = Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+            const hex = Array.from(new Uint8Array(buf))
+              .map((b) => b.toString(16).padStart(2, '0'))
+              .join('');
             link.href = `${prFilesUrl}#diff-${hex}`;
           });
         }
       } else {
         const type = node.isFile ? 'blob' : 'tree';
         const isDeleted = node.diffStatus === 'deleted';
-        const linkRepo = isDeleted ? this.result.repoName : (this.result.headRepoName || this.result.repoName);
+        const linkRepo = isDeleted
+          ? this.result.repoName
+          : this.result.headRepoName || this.result.repoName;
         const linkRef = isDeleted
-          ? (this.result.vsRef || this.result.ref || 'HEAD')
-          : (this.result.ref || 'HEAD');
+          ? this.result.vsRef || this.result.ref || 'HEAD'
+          : this.result.ref || 'HEAD';
         link.href = `https://github.com/${linkRepo}/${type}/${linkRef}/${node.path}`;
       }
 

@@ -19,7 +19,15 @@ addEventListener('message', ({ data }: MessageEvent<WorkerRequest>) => {
     postMessage(response);
   } catch (e) {
     const response: WorkerResponse = {
-      result: { nodes: [], repoName: data.repoName, headRepoName: data.headRepoName, ref: data.ref, vsRef: data.vsRef, isDiff: false, prNumber: null },
+      result: {
+        nodes: [],
+        repoName: data.repoName,
+        headRepoName: data.headRepoName,
+        ref: data.ref,
+        vsRef: data.vsRef,
+        isDiff: false,
+        prNumber: null,
+      },
       error: e instanceof Error ? e.message : String(e),
     };
     postMessage(response);
