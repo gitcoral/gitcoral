@@ -86,6 +86,9 @@ export class Viewer implements OnInit {
   private rawRoot: TreeStructure | null = null;
   repoName = '';
   headBranch = '';
+  private headRepoName = '';
+  private vsLinkRef = '';
+  private prNumber: number | null = null;
   private currentOwner = '';
   private currentRepo = '';
   private isDiffMode = false;
@@ -114,6 +117,7 @@ export class Viewer implements OnInit {
         this.cameraParam = this.route.snapshot.queryParams['cam'] ?? null;
         const q = this.route.snapshot.queryParams['q'] ?? '';
         const color = this.route.snapshot.queryParams['color'] ?? '';
+        const pr = this.route.snapshot.queryParams['pr'] ?? '';
         const show = this.route.snapshot.queryParams['show'] ?? '';
         const vs = this.route.snapshot.queryParams['vs'] ?? '';
         this.initialQuery = q;
@@ -122,16 +126,36 @@ export class Viewer implements OnInit {
         )
           ? (color as ColorMode)
           : 'type';
-        this.initialShow = show;
-        this.initialVs = vs;
-        this.showRef = show;
-        this.vsRef = vs;
         this.display = {
           ...DEFAULT_DISPLAY_OPTIONS,
           pathQuery: q,
           colorMode: this.initialColorMode,
         };
-        setTimeout(() => this.loadBranches(owner, repo, show, vs));
+
+        if (pr) {
+          const prNum = Number(pr);
+          setTimeout(async () => {
+            this.status.set('fetching');
+            try {
+              const prData = await this.github.fetchPR(owner, repo, prNum);
+              this.prNumber = prNum;
+              this.initialShow = prData.headRef;
+              this.initialVs = prData.baseRef;
+              this.showRef = prData.headRef;
+              this.vsRef = prData.baseRef;
+              await this.loadBranches(owner, repo, prData.headSha, prData.baseSha, prData.headRef, prData.baseRef, prData.headRepoName);
+            } catch (e) {
+              this.layout.error.set(e instanceof Error ? e.message : String(e));
+              this.status.set('idle');
+            }
+          });
+        } else {
+          this.initialShow = show;
+          this.initialVs = vs;
+          this.showRef = show;
+          this.vsRef = vs;
+          setTimeout(() => this.loadBranches(owner, repo, show, vs));
+        }
       }
     });
   }
@@ -155,15 +179,16 @@ export class Viewer implements OnInit {
       this.status.set('fetching');
       try {
         const pr = await this.github.fetchPR(parsed.owner, parsed.repo, parsed.prNumber);
-        this.showRef = pr.headSha;
-        this.vsRef = pr.baseSha;
-        this.initialShow = pr.headSha;
-        this.initialVs = pr.baseSha;
+        this.prNumber = parsed.prNumber;
+        this.showRef = pr.headRef;
+        this.vsRef = pr.baseRef;
+        this.initialShow = pr.headRef;
+        this.initialVs = pr.baseRef;
         this.router.navigate([parsed.owner, parsed.repo], {
           replaceUrl: false,
-          queryParams: { show: pr.headSha, vs: pr.baseSha },
+          queryParams: { pr: parsed.prNumber },
         });
-        await this.loadBranches(parsed.owner, parsed.repo, pr.headSha, pr.baseSha);
+        await this.loadBranches(parsed.owner, parsed.repo, pr.headSha, pr.baseSha, pr.headRef, pr.baseRef, pr.headRepoName);
       } catch (e) {
         this.layout.error.set(e instanceof Error ? e.message : String(e));
         this.status.set('idle');
@@ -175,11 +200,13 @@ export class Viewer implements OnInit {
   }
 
   async onBranchesChange(event: BranchesEvent): Promise<void> {
+    this.prNumber = null;
     this.showRef = event.show;
     this.vsRef = event.vs;
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {
+        pr: null,
         show: event.show || null,
         vs: event.vs || null,
       },
@@ -194,6 +221,9 @@ export class Viewer implements OnInit {
     repo: string,
     showRef: string,
     vsRef: string,
+    linkHeadRef?: string,
+    linkBaseRef?: string,
+    linkHeadRepoName?: string,
   ): Promise<void> {
     this.currentOwner = owner;
     this.currentRepo = repo;
@@ -204,7 +234,9 @@ export class Viewer implements OnInit {
         repo,
         showRef || undefined,
       );
-      this.headBranch = resolvedShow;
+      this.headBranch = linkHeadRef || resolvedShow;
+      this.headRepoName = linkHeadRepoName || `${owner}/${repo}`;
+      this.vsLinkRef = linkBaseRef ?? vsRef;
       this.repoName = `${owner}/${repo}`;
 
       if (vsRef.trim()) {
@@ -404,6 +436,9 @@ export class Viewer implements OnInit {
     this.rawRoot = null;
     this.repoName = '';
     this.headBranch = '';
+    this.headRepoName = '';
+    this.vsLinkRef = '';
+    this.prNumber = null;
     this.initialRepo = '';
     this.extColors = [];
     this.showRef = '';
@@ -427,6 +462,6 @@ export class Viewer implements OnInit {
   private scheduleLayout(): void {
     if (!this.rawRoot) return;
     this.status.set('computing');
-    this.layout.schedule(this.rawRoot, this.params, this.repoName, this.isDiffMode);
+    this.layout.schedule(this.rawRoot, this.params, this.repoName, this.headRepoName, this.headBranch, this.vsLinkRef, this.isDiffMode, this.prNumber);
   }
 }

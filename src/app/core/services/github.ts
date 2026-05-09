@@ -12,7 +12,7 @@ interface GithubRepoMeta {
   default_branch: string;
 }
 interface GithubPR {
-  head: { sha: string; ref: string };
+  head: { sha: string; ref: string; repo: { full_name: string } };
   base: { sha: string; ref: string };
 }
 interface GithubCommit {
@@ -68,7 +68,7 @@ export class GithubService {
     owner: string,
     repo: string,
     prNumber: number,
-  ): Promise<{ headSha: string; baseSha: string; headRef: string; baseRef: string }> {
+  ): Promise<{ headSha: string; baseSha: string; headRef: string; baseRef: string; headRepoName: string }> {
     const pr = await this.get<GithubPR>(
       `${this.BASE}/repos/${owner}/${repo}/pulls/${prNumber}`,
       this.HEADERS,
@@ -78,6 +78,7 @@ export class GithubService {
       baseSha: pr.base.sha,
       headRef: pr.head.ref,
       baseRef: pr.base.ref,
+      headRepoName: pr.head.repo.full_name,
     };
   }
 

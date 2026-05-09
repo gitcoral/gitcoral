@@ -13,7 +13,11 @@ interface PendingRequest {
   root: TreeStructure;
   params: LayoutParams;
   repoName: string;
+  headRepoName: string;
+  ref: string;
+  vsRef: string;
   isDiff: boolean;
+  prNumber: number | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -45,10 +49,14 @@ export class LayoutService implements OnDestroy {
     root: TreeStructure,
     params: LayoutParams = DEFAULT_LAYOUT_PARAMS,
     repoName = '',
+    headRepoName = '',
+    ref = '',
+    vsRef = '',
     isDiff = false,
+    prNumber: number | null = null,
   ): void {
     this.loading.set(true);
-    this.request$.next({ root, params, repoName, isDiff });
+    this.request$.next({ root, params, repoName, headRepoName, ref, vsRef, isDiff, prNumber });
   }
 
   ngOnDestroy(): void {
@@ -74,7 +82,7 @@ export class LayoutService implements OnDestroy {
       if (data.error) {
         this.error.set(data.error);
       } else {
-        this.result.set(data.result);
+        this.result.set({ ...data.result, prNumber: req.prNumber });
       }
       this.loading.set(false);
     };
@@ -92,6 +100,9 @@ export class LayoutService implements OnDestroy {
       root: req.root,
       params: req.params,
       repoName: req.repoName,
+      headRepoName: req.headRepoName,
+      ref: req.ref,
+      vsRef: req.vsRef,
       isDiff: req.isDiff,
     } as WorkerRequest);
   }

@@ -102,13 +102,20 @@ export const DEFAULT_DISPLAY_OPTIONS: DisplayOptions = {
 export interface LayoutResult {
   nodes: PositionedNode[];
   repoName: string;
+  headRepoName: string;
+  ref: string;
+  vsRef: string;
   isDiff: boolean;
+  prNumber: number | null;
 }
 
 export interface WorkerRequest {
   root: TreeStructure;
   params: LayoutParams;
   repoName: string;
+  headRepoName: string;
+  ref: string;
+  vsRef: string;
   isDiff?: boolean;
 }
 

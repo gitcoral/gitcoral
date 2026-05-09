@@ -884,13 +884,32 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const hex = toHex(this.colorOf(node));
     let line1: HTMLElement;
     if (isSelected && this.result) {
-      const type = node.isFile ? 'blob' : 'tree';
       const link = document.createElement('a');
-      link.href = `https://github.com/${this.result.repoName}/${type}/HEAD/${node.path}`;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
       link.textContent = node.path || '(root)';
       link.style.cssText = 'color:#1a56db;pointer-events:auto;text-decoration:underline;';
+
+      if (this.result.prNumber && node.path) {
+        const prFilesUrl = `https://github.com/${this.result.repoName}/pull/${this.result.prNumber}/files`;
+        link.href = prFilesUrl;
+        if (node.isFile) {
+          const bytes = new TextEncoder().encode(node.path);
+          crypto.subtle.digest('SHA-256', bytes).then((buf) => {
+            const hex = Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+            link.href = `${prFilesUrl}#diff-${hex}`;
+          });
+        }
+      } else {
+        const type = node.isFile ? 'blob' : 'tree';
+        const isDeleted = node.diffStatus === 'deleted';
+        const linkRepo = isDeleted ? this.result.repoName : (this.result.headRepoName || this.result.repoName);
+        const linkRef = isDeleted
+          ? (this.result.vsRef || this.result.ref || 'HEAD')
+          : (this.result.ref || 'HEAD');
+        link.href = `https://github.com/${linkRepo}/${type}/${linkRef}/${node.path}`;
+      }
+
       line1 = link;
     } else {
       line1 = document.createElement('div');
