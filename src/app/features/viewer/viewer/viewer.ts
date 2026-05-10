@@ -41,7 +41,6 @@ export class Viewer implements OnInit {
   extColors: { ext: string; label: string; color: string; count: number }[] = [];
   status = signal<LoadingState>('idle');
   initialRepo = '';
-  cameraParam: string | null = null;
   initialQuery = '';
   initialColorMode: ColorMode = 'type';
   initialShow = '';
@@ -114,7 +113,6 @@ export class Viewer implements OnInit {
       const { owner, repo } = params;
       if (owner && repo) {
         this.initialRepo = `${owner}/${repo}`;
-        this.cameraParam = this.route.snapshot.queryParams['cam'] ?? null;
         const q = this.route.snapshot.queryParams['q'] ?? '';
         const color = this.route.snapshot.queryParams['color'] ?? '';
         const pr = this.route.snapshot.queryParams['pr'] ?? '';
@@ -181,7 +179,6 @@ export class Viewer implements OnInit {
     this.initialShow = '';
     this.initialVs = '';
     this.repoName = '';
-    this.cameraParam = null;
 
     if (parsed.prNumber) {
       this.status.set('fetching');
@@ -193,7 +190,6 @@ export class Viewer implements OnInit {
         this.initialShow = pr.headRef;
         this.initialVs = pr.baseRef;
         this.router.navigate([parsed.owner, parsed.repo], {
-          replaceUrl: false,
           queryParams: { pr: parsed.prNumber },
         });
         await this.loadBranches(
@@ -210,7 +206,7 @@ export class Viewer implements OnInit {
         this.status.set('idle');
       }
     } else {
-      this.router.navigate([parsed.owner, parsed.repo], { replaceUrl: false });
+      this.router.navigate([parsed.owner, parsed.repo]);
       await this.loadBranches(parsed.owner, parsed.repo, '', '');
     }
   }
@@ -419,15 +415,6 @@ export class Viewer implements OnInit {
         q: display.pathQuery || null,
         color: display.colorMode !== 'type' ? display.colorMode : null,
       },
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
-    });
-  }
-
-  onCameraChange(cam: string): void {
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: { cam },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
