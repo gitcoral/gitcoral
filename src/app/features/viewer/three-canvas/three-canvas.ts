@@ -22,7 +22,7 @@ import {
   Color,
   LessEqualDepth,
   MathUtils,
-  Object3D,
+  Mesh,
   PerspectiveCamera,
   Points,
   Scene,
@@ -32,10 +32,8 @@ import {
   WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
-import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
-import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { VERT, FRAG } from './node-shaders';
+import { EDGE_VERT, EDGE_FRAG } from './edge-shaders';
 import {
   DEFAULT_COLOR,
   buildExtColorMap,
@@ -119,7 +117,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   private alphaAttr: BufferAttribute | null = null;
   private colorAttr: BufferAttribute | null = null;
   private sizeAttr: BufferAttribute | null = null;
-  private edgeObjects: Object3D[] = [];
+  private edgeMesh: Mesh | null = null;
 
   // Drag / orbit detection
   private mouseDownX = 0;
@@ -274,10 +272,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       if (mat.uniforms['uPixelRatio']) mat.uniforms['uPixelRatio'].value = devicePixelRatio;
       if (mat.uniforms['uViewportH']) mat.uniforms['uViewportH'].value = h;
     }
-    for (const obj of this.edgeObjects) {
-      if (obj instanceof LineSegments2) {
-        (obj.material as LineMaterial).resolution.set(w, h);
-      }
+    if (this.edgeMesh) {
+      (this.edgeMesh.material as ShaderMaterial).uniforms['uResolution'].value.set(w, h);
     }
   }
 
@@ -453,14 +449,12 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   }
 
   private disposeEdges(): void {
-    for (const obj of this.edgeObjects) {
-      this.scene.remove(obj);
-      if (obj instanceof LineSegments2) {
-        obj.geometry.dispose();
-        obj.material.dispose();
-      }
+    if (this.edgeMesh) {
+      this.scene.remove(this.edgeMesh);
+      this.edgeMesh.geometry.dispose();
+      (this.edgeMesh.material as ShaderMaterial).dispose();
+      this.edgeMesh = null;
     }
-    this.edgeObjects = [];
   }
 
   // Emits extColorsChange when the result changes (always extension-based, independent of
@@ -635,16 +629,25 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   ): void {
     const inFocus = (path: string) => !focusSet || focusSet.has(path);
     const isPathDim = (path: string) => !focusSet && !!pathDimmedPaths?.has(path);
-    const canvas = this.canvasRef.nativeElement;
 
-    const DEPTH_BUCKETS = 8;
     const zValues = folders.map((n) => n.z);
     const zMin = Math.min(...zValues, 0);
     const zRange = Math.max(...zValues, 1) - zMin || 1;
 
-    // Group segments by (focused, depthBucket, widthBucket) — each batch = one material
-    type Batch = { pos: number[]; col: number[]; depthAlpha: number; width: number };
-    const batches = new Map<string, Batch>();
+    type Seg = {
+      sx: number;
+      sy: number;
+      sz: number;
+      ex: number;
+      ey: number;
+      ez: number;
+      r: number;
+      g: number;
+      b: number;
+      alpha: number;
+      width: number;
+    };
+    const segs: Seg[] = [];
 
     for (const node of folders) {
       if (!node.path) continue;
@@ -657,18 +660,14 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       const focused = inFocus(node.path) && inFocus(pp);
       const pathDimmed = isPathDim(node.path) || isPathDim(pp);
       const diffUnchanged = !!this.result?.isDiff && node.diffStatus === 'unchanged';
-      const depthBucket = Math.min(
-        Math.floor(((node.z - zMin) / zRange) * DEPTH_BUCKETS),
-        DEPTH_BUCKETS - 1,
-      );
+      const depthT = Math.min((node.z - zMin) / zRange, 1.0);
       const { connectorOpacityMin, connectorOpacityMax } = this.display;
-      const depthAlpha = focused
+      const alpha = focused
         ? pathDimmed
           ? PATH_DIM
           : diffUnchanged
             ? DIFF_DIM
-            : connectorOpacityMax -
-              (connectorOpacityMax - connectorOpacityMin) * (depthBucket / (DEPTH_BUCKETS - 1))
+            : connectorOpacityMax - (connectorOpacityMax - connectorOpacityMin) * depthT
         : DIM;
       const t = Math.max(
         0,
@@ -677,40 +676,100 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
           (node.connectionWidth - EDGE_WIDTH_IN_MIN) / (EDGE_WIDTH_IN_MAX - EDGE_WIDTH_IN_MIN),
         ),
       );
-      const scaledW =
-        this.display.connectorWidthMin +
-        (this.display.connectorWidthMax - this.display.connectorWidthMin) * t;
-      const wBucket = Math.round(scaledW * 2) / 2;
-      const key = `${focused ? 1 : 0}-${pathDimmed ? 1 : 0}-${diffUnchanged ? 1 : 0}-${depthBucket}-${wBucket}`;
+      const width =
+        (this.display.connectorWidthMin +
+          (this.display.connectorWidthMax - this.display.connectorWidthMin) * t) /
+        WORLD_SCALE;
 
-      if (!batches.has(key)) batches.set(key, { pos: [], col: [], depthAlpha, width: scaledW });
-      const b = batches.get(key)!;
       // Swap Y↔Z: layout Z is elevation → Three.js Y
-      b.pos.push(-parent.x, parent.z, parent.y, -node.x, node.z, node.y);
-      b.col.push(c.r, c.g, c.b, c.r, c.g, c.b);
+      segs.push({
+        sx: -parent.x,
+        sy: parent.z,
+        sz: parent.y,
+        ex: -node.x,
+        ey: node.z,
+        ez: node.y,
+        r: c.r,
+        g: c.g,
+        b: c.b,
+        alpha,
+        width,
+      });
     }
 
-    for (const [, { pos, col, width, depthAlpha }] of batches) {
-      const geo = new LineSegmentsGeometry();
-      geo.setPositions(pos);
-      geo.setColors(col);
-      const mat = new LineMaterial({
-        vertexColors: true,
-        transparent: true,
-        opacity: depthAlpha,
-        linewidth: width / WORLD_SCALE,
-        depthWrite: false,
-        resolution: new Vector2(canvas.clientWidth, canvas.clientHeight),
-        worldUnits: true,
-        polygonOffset: true,
-        polygonOffsetFactor: 1,
-        polygonOffsetUnits: 1,
-      });
-      const segs = new LineSegments2(geo, mat);
-      segs.renderOrder = 1; // draw after dots; depthWrite:false lets dots show through
-      this.scene.add(segs);
-      this.edgeObjects.push(segs);
+    if (!segs.length) return;
+
+    const N = segs.length;
+    const V = N * 4; // 4 vertices per segment
+
+    const posArr = new Float32Array(V * 3); // dummy positions (computed in vertex shader)
+    const startArr = new Float32Array(V * 3);
+    const endArr = new Float32Array(V * 3);
+    const colorArr = new Float32Array(V * 3);
+    const alphaArr = new Float32Array(V);
+    const widthArr = new Float32Array(V);
+    const isEndArr = new Float32Array(V);
+    const sideArr = new Float32Array(V);
+    const idxArr = new Uint32Array(N * 6);
+
+    // Corner pattern: [start-left, start-right, end-right, end-left]
+    const IS_END: [number, number, number, number] = [0, 0, 1, 1];
+    const SIDE: [number, number, number, number] = [-1, 1, 1, -1];
+
+    for (let i = 0; i < N; i++) {
+      const s = segs[i];
+      const base = i * 4;
+      for (let j = 0; j < 4; j++) {
+        const v = base + j;
+        startArr[v * 3] = s.sx;
+        startArr[v * 3 + 1] = s.sy;
+        startArr[v * 3 + 2] = s.sz;
+        endArr[v * 3] = s.ex;
+        endArr[v * 3 + 1] = s.ey;
+        endArr[v * 3 + 2] = s.ez;
+        colorArr[v * 3] = s.r;
+        colorArr[v * 3 + 1] = s.g;
+        colorArr[v * 3 + 2] = s.b;
+        alphaArr[v] = s.alpha;
+        widthArr[v] = s.width;
+        isEndArr[v] = IS_END[j];
+        sideArr[v] = SIDE[j];
+      }
+      const ii = i * 6;
+      idxArr[ii] = base;
+      idxArr[ii + 1] = base + 2;
+      idxArr[ii + 2] = base + 1;
+      idxArr[ii + 3] = base;
+      idxArr[ii + 4] = base + 3;
+      idxArr[ii + 5] = base + 2;
     }
+
+    const geo = new BufferGeometry();
+    geo.setAttribute('position', new BufferAttribute(posArr, 3));
+    geo.setAttribute('aStart', new BufferAttribute(startArr, 3));
+    geo.setAttribute('aEnd', new BufferAttribute(endArr, 3));
+    geo.setAttribute('aColor', new BufferAttribute(colorArr, 3));
+    geo.setAttribute('aAlpha', new BufferAttribute(alphaArr, 1));
+    geo.setAttribute('aWidth', new BufferAttribute(widthArr, 1));
+    geo.setAttribute('aIsEnd', new BufferAttribute(isEndArr, 1));
+    geo.setAttribute('aSide', new BufferAttribute(sideArr, 1));
+    geo.setIndex(new BufferAttribute(idxArr, 1));
+
+    const canvas = this.canvasRef.nativeElement;
+    const mat = new ShaderMaterial({
+      vertexShader: EDGE_VERT,
+      fragmentShader: EDGE_FRAG,
+      uniforms: {
+        uResolution: { value: new Vector2(canvas.clientWidth, canvas.clientHeight) },
+      },
+      transparent: true,
+      depthWrite: false,
+    });
+
+    this.edgeMesh = new Mesh(geo, mat);
+    this.edgeMesh.frustumCulled = false;
+    this.edgeMesh.renderOrder = 1; // draw after dots; depthWrite:false lets dots show through
+    this.scene.add(this.edgeMesh);
   }
 
   // ---------------------------------------------------------------------------
