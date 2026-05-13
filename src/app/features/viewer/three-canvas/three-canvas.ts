@@ -119,8 +119,13 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   private sizeAttr: BufferAttribute | null = null;
   private edgeMesh: Mesh | null = null;
   private edgeAlphaAttr: BufferAttribute | null = null;
-  private edgeSegmentInfo: { path: string; pp: string; depthT: number; diffUnchanged: boolean }[] =
-    [];
+  private edgeSegmentInfo: {
+    path: string;
+    pp: string;
+    depth: number;
+    depthT: number;
+    diffUnchanged: boolean;
+  }[] = [];
 
   // Drag / orbit detection
   private mouseDownX = 0;
@@ -349,12 +354,14 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.nodesMesh.renderOrder = 0;
     this.scene.add(this.nodesMesh);
 
+    const nodeByPath = new Map(nodes.map((n) => [n.path, n]));
+    this.addEdges(this.cachedFolders, nodeByPath);
+
     this.updateScene();
   }
 
   // Attribute update — called on display/selection changes. No geometry allocation.
-  // rebuildEdges=false skips disposing/recreating connector geometry (alpha-only update).
-  private updateScene(rebuildEdges = true): void {
+  private updateScene(): void {
     if (!this.result || !this.nodesMesh) return;
 
     const nodes = this.result.nodes;
@@ -374,14 +381,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       n.isFile ? toFileSize(n.fileSize ?? 0) : toFolderSize(n.subtreeBytes);
 
     const focusSet = this.selectedNode ? buildFocusSet(nodes, this.selectedNode.path) : null;
-    const {
-      visibleFiles,
-      visibleFolders,
-      pathDimmedFiles,
-      pathDimmedFolders,
-      foldersWithContent,
-      inDepthRange,
-    } = this.computeVisibility(this.cachedFiles, this.cachedFolders);
+    const { visibleFiles, visibleFolders, pathDimmedFiles, pathDimmedFolders, foldersWithContent } =
+      this.computeVisibility(this.cachedFiles, this.cachedFolders);
 
     const pathDimmedSet = new Set([...pathDimmedFolders, ...pathDimmedFiles].map((n) => n.path));
     const visibleSet = new Set([...visibleFolders, ...visibleFiles].map((n) => n.path));
@@ -428,18 +429,12 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     siz.needsUpdate = true;
     alp.needsUpdate = true;
 
-    const pathDimmedFolderPaths = new Set(pathDimmedFolders.map((n) => n.path));
-    if (rebuildEdges) {
-      this.disposeEdges();
-      if (this.display.showConnectors) {
-        const nodeByPath = new Map(nodes.map((n) => [n.path, n]));
-        const edgeFolders = this.cachedFolders.filter(
-          (n) => foldersWithContent.has(n.path) && inDepthRange(n.path),
-        );
-        this.addEdges(edgeFolders, nodeByPath, focusSet, pathDimmedFolderPaths);
-      }
-    } else if (this.display.showConnectors) {
-      this.updateEdgeAlphas(focusSet, pathDimmedFolderPaths);
+    if (this.edgeMesh) {
+      const mat = this.edgeMesh.material as ShaderMaterial;
+      mat.uniforms['uWidthMin'].value = this.display.connectorWidthMin / WORLD_SCALE;
+      mat.uniforms['uWidthMax'].value = this.display.connectorWidthMax / WORLD_SCALE;
+      const pathDimmedFolderPaths = new Set(pathDimmedFolders.map((n) => n.path));
+      this.updateEdgeAlphas(focusSet, pathDimmedFolderPaths, foldersWithContent);
     }
   }
 
@@ -631,15 +626,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     };
   }
 
-  private addEdges(
-    folders: PositionedNode[],
-    nodeByPath: Map<string, PositionedNode>,
-    focusSet: Set<string> | null,
-    pathDimmedPaths?: Set<string>,
-  ): void {
-    const inFocus = (path: string) => !focusSet || focusSet.has(path);
-    const isPathDim = (path: string) => !focusSet && !!pathDimmedPaths?.has(path);
-
+  private addEdges(folders: PositionedNode[], nodeByPath: Map<string, PositionedNode>): void {
     const zValues = folders.map((n) => n.z);
     const zMin = Math.min(...zValues, 0);
     const zRange = Math.max(...zValues, 1) - zMin || 1;
@@ -654,14 +641,10 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       r: number;
       g: number;
       b: number;
-      alpha: number;
-      width: number;
-      path: string;
-      pp: string;
-      depthT: number;
-      diffUnchanged: boolean;
+      widthT: number;
     };
     const segs: Seg[] = [];
+    const segInfo: typeof this.edgeSegmentInfo = [];
 
     for (const node of folders) {
       if (!node.path) continue;
@@ -671,29 +654,16 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
       const hue = hashPath(node.path) % 360;
       const c = new Color(`hsl(${hue},20%,60%)`);
-      const focused = inFocus(node.path) && inFocus(pp);
-      const pathDimmed = isPathDim(node.path) || isPathDim(pp);
-      const diffUnchanged = !!this.result?.isDiff && node.diffStatus === 'unchanged';
       const depthT = Math.min((node.z - zMin) / zRange, 1.0);
-      const { connectorOpacityMin, connectorOpacityMax } = this.display;
-      const alpha = focused
-        ? pathDimmed
-          ? PATH_DIM
-          : diffUnchanged
-            ? DIFF_DIM
-            : connectorOpacityMax - (connectorOpacityMax - connectorOpacityMin) * depthT
-        : DIM;
-      const t = Math.max(
+      const depth = node.path.split('/').length;
+      const diffUnchanged = !!this.result?.isDiff && node.diffStatus === 'unchanged';
+      const widthT = Math.max(
         0,
         Math.min(
           1,
           (node.connectionWidth - EDGE_WIDTH_IN_MIN) / (EDGE_WIDTH_IN_MAX - EDGE_WIDTH_IN_MIN),
         ),
       );
-      const width =
-        (this.display.connectorWidthMin +
-          (this.display.connectorWidthMax - this.display.connectorWidthMin) * t) /
-        WORLD_SCALE;
 
       // Swap Y↔Z: layout Z is elevation → Three.js Y
       segs.push({
@@ -706,23 +676,14 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
         r: c.r,
         g: c.g,
         b: c.b,
-        alpha,
-        width,
-        path: node.path,
-        pp,
-        depthT,
-        diffUnchanged,
+        widthT,
       });
+      segInfo.push({ path: node.path, pp, depth, depthT, diffUnchanged });
     }
 
     if (!segs.length) return;
 
-    this.edgeSegmentInfo = segs.map(({ path, pp, depthT, diffUnchanged }) => ({
-      path,
-      pp,
-      depthT,
-      diffUnchanged,
-    }));
+    this.edgeSegmentInfo = segInfo;
 
     const N = segs.length;
     const V = N * 4; // 4 vertices per segment
@@ -731,8 +692,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const startArr = new Float32Array(V * 3);
     const endArr = new Float32Array(V * 3);
     const colorArr = new Float32Array(V * 3);
-    const alphaArr = new Float32Array(V);
-    const widthArr = new Float32Array(V);
+    const alphaArr = new Float32Array(V); // initialised to 0; set by updateEdgeAlphas
+    const widthTArr = new Float32Array(V);
     const isEndArr = new Float32Array(V);
     const sideArr = new Float32Array(V);
     const idxArr = new Uint32Array(N * 6);
@@ -755,8 +716,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
         colorArr[v * 3] = s.r;
         colorArr[v * 3 + 1] = s.g;
         colorArr[v * 3 + 2] = s.b;
-        alphaArr[v] = s.alpha;
-        widthArr[v] = s.width;
+        widthTArr[v] = s.widthT;
         isEndArr[v] = IS_END[j];
         sideArr[v] = SIDE[j];
       }
@@ -776,7 +736,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     geo.setAttribute('aColor', new BufferAttribute(colorArr, 3));
     this.edgeAlphaAttr = new BufferAttribute(alphaArr, 1);
     geo.setAttribute('aAlpha', this.edgeAlphaAttr);
-    geo.setAttribute('aWidth', new BufferAttribute(widthArr, 1));
+    geo.setAttribute('aWidthT', new BufferAttribute(widthTArr, 1));
     geo.setAttribute('aIsEnd', new BufferAttribute(isEndArr, 1));
     geo.setAttribute('aSide', new BufferAttribute(sideArr, 1));
     geo.setIndex(new BufferAttribute(idxArr, 1));
@@ -787,6 +747,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       fragmentShader: EDGE_FRAG,
       uniforms: {
         uResolution: { value: new Vector2(canvas.clientWidth, canvas.clientHeight) },
+        uWidthMin: { value: this.display.connectorWidthMin / WORLD_SCALE },
+        uWidthMax: { value: this.display.connectorWidthMax / WORLD_SCALE },
       },
       transparent: true,
       depthWrite: false,
@@ -798,22 +760,31 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.scene.add(this.edgeMesh);
   }
 
-  private updateEdgeAlphas(focusSet: Set<string> | null, pathDimmedFolderPaths: Set<string>): void {
+  private updateEdgeAlphas(
+    focusSet: Set<string> | null,
+    pathDimmedFolderPaths: Set<string>,
+    foldersWithContent: Set<string>,
+  ): void {
     if (!this.edgeAlphaAttr || !this.edgeSegmentInfo.length) return;
+    const { showConnectors, depthMin, depthMax, connectorOpacityMin, connectorOpacityMax } =
+      this.display;
     const inFocus = (path: string) => !focusSet || focusSet.has(path);
     const isPathDim = (path: string) => !focusSet && pathDimmedFolderPaths.has(path);
-    const { connectorOpacityMin, connectorOpacityMax } = this.display;
     for (let i = 0; i < this.edgeSegmentInfo.length; i++) {
-      const { path, pp, depthT, diffUnchanged } = this.edgeSegmentInfo[i];
+      const { path, pp, depth, depthT, diffUnchanged } = this.edgeSegmentInfo[i];
+      const visible =
+        showConnectors && foldersWithContent.has(path) && depth >= depthMin && depth <= depthMax;
       const focused = inFocus(path) && inFocus(pp);
       const pathDimmed = isPathDim(path) || isPathDim(pp);
-      const alpha = focused
-        ? pathDimmed
-          ? PATH_DIM
-          : diffUnchanged
-            ? DIFF_DIM
-            : connectorOpacityMax - (connectorOpacityMax - connectorOpacityMin) * depthT
-        : DIM;
+      const alpha = !visible
+        ? 0
+        : focused
+          ? pathDimmed
+            ? PATH_DIM
+            : diffUnchanged
+              ? DIFF_DIM
+              : connectorOpacityMax - (connectorOpacityMax - connectorOpacityMin) * depthT
+          : DIM;
       for (let j = 0; j < 4; j++) this.edgeAlphaAttr.setX(i * 4 + j, alpha);
     }
     this.edgeAlphaAttr.needsUpdate = true;
@@ -1098,6 +1069,6 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       this.selectedNode = null;
       this.hideTooltip();
     }
-    if (this.result) this.updateScene(false);
+    if (this.result) this.updateScene();
   }
 }

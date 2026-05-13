@@ -7,7 +7,7 @@ export const EDGE_VERT = /* glsl */ `
   attribute vec3  aEnd;     // world-space segment end
   attribute vec3  aColor;
   attribute float aAlpha;
-  attribute float aWidth;   // world units
+  attribute float aWidthT;  // normalised width factor 0–1
   attribute float aIsEnd;   // 0 = start side, 1 = end side
   attribute float aSide;    // -1 or +1 (left / right of direction)
 
@@ -18,7 +18,9 @@ export const EDGE_VERT = /* glsl */ `
   varying float vSegLen;  // segment length in screen px
   varying float vHalfW;   // half-width in screen px
 
-  uniform vec2 uResolution;  // canvas size in CSS pixels
+  uniform vec2  uResolution;  // canvas size in CSS pixels
+  uniform float uWidthMin;    // world units
+  uniform float uWidthMax;    // world units
 
   void main() {
     vec4 mvS = modelViewMatrix * vec4(aStart, 1.0);
@@ -41,8 +43,9 @@ export const EDGE_VERT = /* glsl */ `
     vec2  perpN = vec2(-dirN.y, dirN.x);
 
     // Half-width in CSS px via perspective (world units → screen using average eye depth)
-    float eyeD  = mix(-mvS.z, -mvE.z, 0.5);
-    float halfW = max(aWidth * 0.5 * projectionMatrix[1][1] * uResolution.y * 0.5 / eyeD, 0.5);
+    float eyeD   = mix(-mvS.z, -mvE.z, 0.5);
+    float worldW = uWidthMin + (uWidthMax - uWidthMin) * aWidthT;
+    float halfW  = max(worldW * 0.5 * projectionMatrix[1][1] * uResolution.y * 0.5 / eyeD, 0.5);
 
     // Extend each end of the quad by halfW to accommodate the rounded caps
     float capDir = aIsEnd > 0.5 ? 1.0 : -1.0;
