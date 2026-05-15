@@ -88,9 +88,9 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   readonly gitHash = GIT_HASH;
 
   readonly examples = [
-    { repo: 'facebook/react', image: '/examples/facebook-react.svg' },
-    { repo: 'torvalds/linux', image: '/examples/torvalds-linux.svg' },
-    { repo: 'angular/angular', image: '/examples/angular-angular.svg' },
+    { repo: 'facebook/react', image: '/examples/facebook-react.png' },
+    { repo: 'torvalds/linux', image: '/examples/torvalds-linux.png' },
+    { repo: 'angular/angular', image: '/examples/angular-angular.png' },
   ];
 
   // Log-scale slider positions (0–1000); converted to bytes on change.
