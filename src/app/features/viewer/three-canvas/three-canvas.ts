@@ -111,13 +111,13 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   private cachedFolders: PositionedNode[] = [];
 
   // Two-pass node rendering: ghost (no depth) + focused (depth-tested), shared geometry.
-  private ghostMesh:   Points | null = null;
+  private ghostMesh: Points | null = null;
   private focusedMesh: Points | null = null;
 
-  private alphaAttr:   BufferAttribute | null = null;
+  private alphaAttr: BufferAttribute | null = null;
   private focusedAttr: BufferAttribute | null = null;
-  private colorAttr:   BufferAttribute | null = null;
-  private sizeAttr:    BufferAttribute | null = null;
+  private colorAttr: BufferAttribute | null = null;
+  private sizeAttr: BufferAttribute | null = null;
 
   private edgeMesh: Mesh | null = null;
   private edgeAlphaAttr: BufferAttribute | null = null;
@@ -131,9 +131,9 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
   // Animator state (per-node and per-edge-segment)
   private nodeCurrentAlphas: Float32Array | null = null;
-  private nodeTargetAlphas:  Float32Array | null = null;
+  private nodeTargetAlphas: Float32Array | null = null;
   private edgeCurrentAlphas: Float32Array | null = null;
-  private edgeTargetAlphas:  Float32Array | null = null;
+  private edgeTargetAlphas: Float32Array | null = null;
 
   // Drag / orbit detection
   private mouseDownX = 0;
@@ -348,7 +348,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     }
 
     const geo = new BufferGeometry();
-    geo.setAttribute('position',  new BufferAttribute(pos, 3));
+    geo.setAttribute('position', new BufferAttribute(pos, 3));
     geo.setAttribute('aIsFolder', new BufferAttribute(fld, 1));
     this.colorAttr = new BufferAttribute(col, 3);
     geo.setAttribute('aColor', this.colorAttr);
@@ -372,7 +372,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     // Initialize animator arrays; updateScene will fill nodeTargetAlphas.
     this.nodeCurrentAlphas = new Float32Array(n);
-    this.nodeTargetAlphas  = new Float32Array(n);
+    this.nodeTargetAlphas = new Float32Array(n);
 
     const nodeByPath = new Map(nodes.map((nd) => [nd.path, nd]));
     this.addEdges(this.cachedFolders, nodeByPath);
@@ -444,7 +444,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
         : focusSet
           ? inFocus(node.path)
             ? pathDimmed
-              ? PATH_DIM  // filter takes priority: focused-but-path-dimmed nodes stay dim
+              ? PATH_DIM // filter takes priority: focused-but-path-dimmed nodes stay dim
               : diffUnchanged
                 ? DIFF_DIM
                 : 1.0
@@ -486,16 +486,16 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       (this.focusedMesh.material as ShaderMaterial).dispose();
       this.scene.remove(this.focusedMesh);
     }
-    this.ghostMesh  = null;
+    this.ghostMesh = null;
     this.focusedMesh = null;
-    this.alphaAttr   = null;
+    this.alphaAttr = null;
     this.focusedAttr = null;
-    this.colorAttr   = null;
-    this.sizeAttr    = null;
+    this.colorAttr = null;
+    this.sizeAttr = null;
     this.nodeCurrentAlphas = null;
-    this.nodeTargetAlphas  = null;
+    this.nodeTargetAlphas = null;
     this.edgeCurrentAlphas = null;
-    this.edgeTargetAlphas  = null;
+    this.edgeTargetAlphas = null;
   }
 
   private disposeEdges(): void {
@@ -735,39 +735,39 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const N = segs.length;
     const V = N * 4; // 4 vertices per segment
 
-    const posArr   = new Float32Array(V * 3);
+    const posArr = new Float32Array(V * 3);
     const startArr = new Float32Array(V * 3);
-    const endArr   = new Float32Array(V * 3);
+    const endArr = new Float32Array(V * 3);
     const colorArr = new Float32Array(V * 3);
     const alphaArr = new Float32Array(V);
     const widthTArr = new Float32Array(V);
     const isEndArr = new Float32Array(V);
-    const sideArr  = new Float32Array(V);
-    const idxArr   = new Uint32Array(N * 6);
+    const sideArr = new Float32Array(V);
+    const idxArr = new Uint32Array(N * 6);
 
     const IS_END: [number, number, number, number] = [0, 0, 1, 1];
-    const SIDE:   [number, number, number, number] = [-1, 1, 1, -1];
+    const SIDE: [number, number, number, number] = [-1, 1, 1, -1];
 
     for (let i = 0; i < N; i++) {
       const s = segs[i];
       const base = i * 4;
       for (let j = 0; j < 4; j++) {
         const v = base + j;
-        startArr[v * 3]     = s.sx;
+        startArr[v * 3] = s.sx;
         startArr[v * 3 + 1] = s.sy;
         startArr[v * 3 + 2] = s.sz;
-        endArr[v * 3]       = s.ex;
-        endArr[v * 3 + 1]   = s.ey;
-        endArr[v * 3 + 2]   = s.ez;
-        colorArr[v * 3]     = s.r;
+        endArr[v * 3] = s.ex;
+        endArr[v * 3 + 1] = s.ey;
+        endArr[v * 3 + 2] = s.ez;
+        colorArr[v * 3] = s.r;
         colorArr[v * 3 + 1] = s.g;
         colorArr[v * 3 + 2] = s.b;
         widthTArr[v] = s.widthT;
-        isEndArr[v]  = IS_END[j];
-        sideArr[v]   = SIDE[j];
+        isEndArr[v] = IS_END[j];
+        sideArr[v] = SIDE[j];
       }
       const ii = i * 6;
-      idxArr[ii]     = base;
+      idxArr[ii] = base;
       idxArr[ii + 1] = base + 2;
       idxArr[ii + 2] = base + 1;
       idxArr[ii + 3] = base;
@@ -777,27 +777,27 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     const geo = new BufferGeometry();
     geo.setAttribute('position', new BufferAttribute(posArr, 3));
-    geo.setAttribute('aStart',   new BufferAttribute(startArr, 3));
-    geo.setAttribute('aEnd',     new BufferAttribute(endArr, 3));
-    geo.setAttribute('aColor',   new BufferAttribute(colorArr, 3));
+    geo.setAttribute('aStart', new BufferAttribute(startArr, 3));
+    geo.setAttribute('aEnd', new BufferAttribute(endArr, 3));
+    geo.setAttribute('aColor', new BufferAttribute(colorArr, 3));
     this.edgeAlphaAttr = new BufferAttribute(alphaArr, 1);
-    geo.setAttribute('aAlpha',   this.edgeAlphaAttr);
-    geo.setAttribute('aWidthT',  new BufferAttribute(widthTArr, 1));
-    geo.setAttribute('aIsEnd',   new BufferAttribute(isEndArr, 1));
-    geo.setAttribute('aSide',    new BufferAttribute(sideArr, 1));
+    geo.setAttribute('aAlpha', this.edgeAlphaAttr);
+    geo.setAttribute('aWidthT', new BufferAttribute(widthTArr, 1));
+    geo.setAttribute('aIsEnd', new BufferAttribute(isEndArr, 1));
+    geo.setAttribute('aSide', new BufferAttribute(sideArr, 1));
     geo.setIndex(new BufferAttribute(idxArr, 1));
 
     const canvas = this.canvasRef.nativeElement;
     const mat = new ShaderMaterial({
-      vertexShader:   EDGE_VERT,
+      vertexShader: EDGE_VERT,
       fragmentShader: EDGE_FRAG,
       uniforms: {
         uResolution: { value: new Vector2(canvas.clientWidth, canvas.clientHeight) },
-        uWidthMin:   { value: this.display.connectorWidthMin / WORLD_SCALE },
-        uWidthMax:   { value: this.display.connectorWidthMax / WORLD_SCALE },
+        uWidthMin: { value: this.display.connectorWidthMin / WORLD_SCALE },
+        uWidthMax: { value: this.display.connectorWidthMax / WORLD_SCALE },
       },
       transparent: true,
-      depthWrite:  false,
+      depthWrite: false,
     });
 
     this.edgeMesh = new Mesh(geo, mat);
@@ -818,13 +818,13 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     if (!this.edgeTargetAlphas || this.edgeTargetAlphas.length !== this.edgeSegmentInfo.length) {
       this.edgeTargetAlphas = new Float32Array(this.edgeSegmentInfo.length);
     }
-    const inFocus   = (path: string) => !focusSet || focusSet.has(path);
+    const inFocus = (path: string) => !focusSet || focusSet.has(path);
     const isPathDim = (path: string) => pathDimmedFolderPaths.has(path);
     for (let i = 0; i < this.edgeSegmentInfo.length; i++) {
       const { path, pp, depth, depthT, diffUnchanged } = this.edgeSegmentInfo[i];
       const visible =
         showConnectors && foldersWithContent.has(path) && depth >= depthMin && depth <= depthMax;
-      const focused  = inFocus(path) && inFocus(pp);
+      const focused = inFocus(path) && inFocus(pp);
       const pathDimmed = isPathDim(path) || isPathDim(pp);
       this.edgeTargetAlphas[i] = !visible
         ? 0
@@ -845,12 +845,12 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   private makeNodeMat(pass: number, depthWrite: boolean, depthTest: boolean): ShaderMaterial {
     const canvas = this.canvasRef.nativeElement;
     return new ShaderMaterial({
-      vertexShader:   VERT,
+      vertexShader: VERT,
       fragmentShader: FRAG,
       uniforms: {
         uPixelRatio: { value: devicePixelRatio },
-        uViewportH:  { value: canvas.clientHeight || 600 },
-        uPass:       { value: pass },
+        uViewportH: { value: canvas.clientHeight || 600 },
+        uPass: { value: pass },
       },
       transparent: true,
       depthWrite,
@@ -860,7 +860,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
   private tickAnimator(dt: number): boolean {
     if (!this.nodeCurrentAlphas || !this.nodeTargetAlphas) return false;
-    const kDim    = 1 - Math.exp(-dt * 10);
+    const kDim = 1 - Math.exp(-dt * 10);
     const kBright = 1 - Math.exp(-dt * 10);
     let changed = false;
     for (let i = 0; i < this.nodeCurrentAlphas.length; i++) {
@@ -891,7 +891,10 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const arr = this.edgeAlphaAttr.array as Float32Array;
     for (let i = 0; i < this.edgeCurrentAlphas.length; i++) {
       const a = this.edgeCurrentAlphas[i];
-      arr[i * 4] = a; arr[i * 4 + 1] = a; arr[i * 4 + 2] = a; arr[i * 4 + 3] = a;
+      arr[i * 4] = a;
+      arr[i * 4 + 1] = a;
+      arr[i * 4 + 2] = a;
+      arr[i * 4 + 3] = a;
     }
     this.edgeAlphaAttr.needsUpdate = true;
   }
