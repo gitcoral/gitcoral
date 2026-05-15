@@ -383,11 +383,6 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.nodeCurrentAlphas.set(this.nodeTargetAlphas);
     (this.alphaAttr.array as Float32Array).set(this.nodeCurrentAlphas);
     this.alphaAttr.needsUpdate = true;
-    const focArr = this.focusedAttr!.array as Float32Array;
-    for (let i = 0; i < this.nodeCurrentAlphas.length; i++) {
-      focArr[i] = this.nodeCurrentAlphas[i] >= 1.0 ? 1.0 : 0.0;
-    }
-    this.focusedAttr!.needsUpdate = true;
     if (this.edgeTargetAlphas) {
       this.edgeCurrentAlphas = new Float32Array(this.edgeTargetAlphas);
       this.flushEdgeAlphas();
@@ -461,10 +456,9 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
               : 1.0;
 
       targets[i] = targetAlpha;
-      // Instant switch to ghost pass when dimming — fixes z-order during animation.
-      // The reverse (ghost → focused) is done gradually in tickAnimator once alpha is
-      // close to 1, so fade-in is visually symmetric with fade-out.
-      if (targetAlpha < 1.0) foc.setX(i, 0.0);
+      // Switch pass membership instantly so z-order is always correct regardless of
+      // where the animated alpha currently is.
+      foc.setX(i, targetAlpha >= 1.0 ? 1.0 : 0.0);
     }
 
     col.needsUpdate = true;
@@ -877,20 +871,6 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
         this.nodeCurrentAlphas[i] += d * (d < 0 ? kDim : kBright);
         changed = true;
       }
-    }
-    // Promote to focused pass once alpha is nearly full — keeps fade-in symmetric
-    // with fade-out (both visible as the animation runs). updateScene handles the
-    // reverse (focused → ghost) instantly so z-order is always correct when dimming.
-    if (this.focusedAttr) {
-      const focArr = this.focusedAttr.array as Float32Array;
-      let focChanged = false;
-      for (let i = 0; i < this.nodeCurrentAlphas.length; i++) {
-        if (this.nodeTargetAlphas[i] >= 1.0 && this.nodeCurrentAlphas[i] >= 0.9 && focArr[i] < 0.5) {
-          focArr[i] = 1.0;
-          focChanged = true;
-        }
-      }
-      if (focChanged) this.focusedAttr.needsUpdate = true;
     }
     if (this.edgeCurrentAlphas && this.edgeTargetAlphas) {
       for (let i = 0; i < this.edgeCurrentAlphas.length; i++) {
