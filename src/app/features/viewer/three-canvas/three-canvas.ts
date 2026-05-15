@@ -20,7 +20,6 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
-  LessEqualDepth,
   MathUtils,
   Mesh,
   PerspectiveCamera,
@@ -55,9 +54,6 @@ const DIFF_DIM = 0.12;
 const BG = new Color(0x0c0e12);
 const EDGE_WIDTH_IN_MIN = 2;
 const EDGE_WIDTH_IN_MAX = 12;
-// Converts CSS-pixel-valued display settings to world units so nodes/connectors
-// scale naturally with camera distance. Value chosen so the default view looks
-// the same as the previous fixed-pixel rendering.
 const WORLD_SCALE = 100;
 
 // ---------------------------------------------------------------------------
@@ -113,10 +109,16 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   // Geometry — rebuilt only when result changes
   private cachedFiles: PositionedNode[] = [];
   private cachedFolders: PositionedNode[] = [];
-  private nodesMesh: Points | null = null;
-  private alphaAttr: BufferAttribute | null = null;
-  private colorAttr: BufferAttribute | null = null;
-  private sizeAttr: BufferAttribute | null = null;
+
+  // Two-pass node rendering: ghost (no depth) + focused (depth-tested), shared geometry.
+  private ghostMesh:   Points | null = null;
+  private focusedMesh: Points | null = null;
+
+  private alphaAttr:   BufferAttribute | null = null;
+  private focusedAttr: BufferAttribute | null = null;
+  private colorAttr:   BufferAttribute | null = null;
+  private sizeAttr:    BufferAttribute | null = null;
+
   private edgeMesh: Mesh | null = null;
   private edgeAlphaAttr: BufferAttribute | null = null;
   private edgeSegmentInfo: {
@@ -126,6 +128,12 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     depthT: number;
     diffUnchanged: boolean;
   }[] = [];
+
+  // Animator state (per-node and per-edge-segment)
+  private nodeCurrentAlphas: Float32Array | null = null;
+  private nodeTargetAlphas:  Float32Array | null = null;
+  private edgeCurrentAlphas: Float32Array | null = null;
+  private edgeTargetAlphas:  Float32Array | null = null;
 
   // Drag / orbit detection
   private mouseDownX = 0;
@@ -249,8 +257,20 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
   private startLoop(): void {
     const proj = new Vector3();
-    const loop = () => {
+    let lastTime = performance.now();
+    const loop = (now: number) => {
       this.rafId = requestAnimationFrame(loop);
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      if (this.tickAnimator(dt)) {
+        if (this.alphaAttr && this.nodeCurrentAlphas) {
+          (this.alphaAttr.array as Float32Array).set(this.nodeCurrentAlphas);
+          this.alphaAttr.needsUpdate = true;
+        }
+        this.flushEdgeAlphas();
+      }
+
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
 
@@ -264,7 +284,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
         this.tipEl.style.top = `${sy + 12}px`;
       }
     };
-    loop();
+    requestAnimationFrame(loop);
   }
 
   private onResize(): void {
@@ -275,10 +295,11 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h, false);
-    if (this.nodesMesh) {
-      const mat = this.nodesMesh.material as ShaderMaterial;
-      if (mat.uniforms['uPixelRatio']) mat.uniforms['uPixelRatio'].value = devicePixelRatio;
-      if (mat.uniforms['uViewportH']) mat.uniforms['uViewportH'].value = h;
+    for (const mesh of [this.ghostMesh, this.focusedMesh]) {
+      if (!mesh) continue;
+      const mat = mesh.material as ShaderMaterial;
+      mat.uniforms['uPixelRatio'].value = devicePixelRatio;
+      mat.uniforms['uViewportH'].value = h;
     }
     if (this.edgeMesh) {
       (this.edgeMesh.material as ShaderMaterial).uniforms['uResolution'].value.set(w, h);
@@ -305,6 +326,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const col = new Float32Array(n * 3);
     const siz = new Float32Array(n);
     const alp = new Float32Array(n);
+    const foc = new Float32Array(n).fill(1.0);
 
     // Folders first, then files — matches the order expected by updateScene and raycast.
     const allNodes: PositionedNode[] = new Array(n);
@@ -321,13 +343,12 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       pos[i * 3] = -node.x;
       pos[i * 3 + 1] = node.z;
       pos[i * 3 + 2] = node.y;
-      // fld[i] stays 0 (Float32Array default)
       allNodes[i] = node;
       i++;
     }
 
     const geo = new BufferGeometry();
-    geo.setAttribute('position', new BufferAttribute(pos, 3));
+    geo.setAttribute('position',  new BufferAttribute(pos, 3));
     geo.setAttribute('aIsFolder', new BufferAttribute(fld, 1));
     this.colorAttr = new BufferAttribute(col, 3);
     geo.setAttribute('aColor', this.colorAttr);
@@ -335,34 +356,47 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     geo.setAttribute('aSize', this.sizeAttr);
     this.alphaAttr = new BufferAttribute(alp, 1);
     geo.setAttribute('aAlpha', this.alphaAttr);
+    this.focusedAttr = new BufferAttribute(foc, 1);
+    geo.setAttribute('aFocused', this.focusedAttr);
     geo.userData['nodes'] = allNodes;
 
-    const canvas = this.canvasRef.nativeElement;
-    const mat = new ShaderMaterial({
-      vertexShader: VERT,
-      fragmentShader: FRAG,
-      uniforms: {
-        uPixelRatio: { value: devicePixelRatio },
-        uViewportH: { value: canvas.clientHeight || 600 },
-      },
-      transparent: true,
-      depthWrite: true,
-      depthFunc: LessEqualDepth,
-    });
+    // Ghost pass: no depth test/write so dimmed nodes never occlude focused ones.
+    this.ghostMesh = new Points(geo, this.makeNodeMat(0, false, false));
+    this.ghostMesh.renderOrder = 0;
+    this.scene.add(this.ghostMesh);
 
-    this.nodesMesh = new Points(geo, mat);
-    this.nodesMesh.renderOrder = 0;
-    this.scene.add(this.nodesMesh);
+    // Focused pass: depth test/write so focused nodes occlude each other correctly.
+    this.focusedMesh = new Points(geo, this.makeNodeMat(1, true, true));
+    this.focusedMesh.renderOrder = 1;
+    this.scene.add(this.focusedMesh);
 
-    const nodeByPath = new Map(nodes.map((n) => [n.path, n]));
+    // Initialize animator arrays; updateScene will fill nodeTargetAlphas.
+    this.nodeCurrentAlphas = new Float32Array(n);
+    this.nodeTargetAlphas  = new Float32Array(n);
+
+    const nodeByPath = new Map(nodes.map((nd) => [nd.path, nd]));
     this.addEdges(this.cachedFolders, nodeByPath);
 
     this.updateScene();
+
+    // Snap current to target for initial load — no fade-in on first display.
+    this.nodeCurrentAlphas.set(this.nodeTargetAlphas);
+    (this.alphaAttr.array as Float32Array).set(this.nodeCurrentAlphas);
+    this.alphaAttr.needsUpdate = true;
+    const focArr = this.focusedAttr!.array as Float32Array;
+    for (let i = 0; i < this.nodeCurrentAlphas.length; i++) {
+      focArr[i] = this.nodeCurrentAlphas[i] >= 1.0 ? 1.0 : 0.0;
+    }
+    this.focusedAttr!.needsUpdate = true;
+    if (this.edgeTargetAlphas) {
+      this.edgeCurrentAlphas = new Float32Array(this.edgeTargetAlphas);
+      this.flushEdgeAlphas();
+    }
   }
 
   // Attribute update — called on display/selection changes. No geometry allocation.
   private updateScene(): void {
-    if (!this.result || !this.nodesMesh) return;
+    if (!this.result || !this.ghostMesh) return;
 
     const nodes = this.result.nodes;
     const colorOf = this.buildColorFn(this.cachedFiles, this.cachedFolders, nodes);
@@ -395,39 +429,47 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     this.dimmedPaths = new Set([...pathDimmedSet, ...diffDimmedSet, ...focusDimmedSet]);
     const inFocus = (path: string) => !focusSet || focusSet.has(path);
 
-    const meshNodes = this.nodesMesh.geometry.userData['nodes'] as PositionedNode[];
+    const meshNodes = this.ghostMesh.geometry.userData['nodes'] as PositionedNode[];
     const col = this.colorAttr!;
     const siz = this.sizeAttr!;
-    const alp = this.alphaAttr!;
+    const foc = this.focusedAttr!;
+    const targets = this.nodeTargetAlphas!;
 
     for (let i = 0; i < meshNodes.length; i++) {
       const node = meshNodes[i];
       const c = colorOf(node);
       col.setXYZ(i, c.r, c.g, c.b);
       siz.setX(i, toSize(node) / WORLD_SCALE);
+
       const active = visibleSet.has(node.path) || pathDimmedSet.has(node.path);
       const diffUnchanged = !!this.result?.isDiff && node.diffStatus === 'unchanged';
-      alp.setX(
-        i,
-        !active
-          ? 0
-          : focusSet
-            ? inFocus(node.path)
-              ? diffUnchanged
-                ? DIFF_DIM
-                : 1.0
-              : DIM
-            : pathDimmedSet.has(node.path)
-              ? PATH_DIM
+      const pathDimmed = pathDimmedSet.has(node.path);
+      const targetAlpha = !active
+        ? 0
+        : focusSet
+          ? inFocus(node.path)
+            ? pathDimmed
+              ? PATH_DIM  // filter takes priority: focused-but-path-dimmed nodes stay dim
               : diffUnchanged
                 ? DIFF_DIM
-                : 1.0,
-      );
+                : 1.0
+            : DIM
+          : pathDimmed
+            ? PATH_DIM
+            : diffUnchanged
+              ? DIFF_DIM
+              : 1.0;
+
+      targets[i] = targetAlpha;
+      // Instant switch to ghost pass when dimming — fixes z-order during animation.
+      // The reverse (ghost → focused) is done gradually in tickAnimator once alpha is
+      // close to 1, so fade-in is visually symmetric with fade-out.
+      if (targetAlpha < 1.0) foc.setX(i, 0.0);
     }
 
     col.needsUpdate = true;
     siz.needsUpdate = true;
-    alp.needsUpdate = true;
+    foc.needsUpdate = true;
 
     if (this.edgeMesh) {
       const mat = this.edgeMesh.material as ShaderMaterial;
@@ -440,15 +482,26 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
   private disposeAll(): void {
     this.disposeEdges();
-    if (this.nodesMesh) {
-      this.scene.remove(this.nodesMesh);
-      this.nodesMesh.geometry.dispose();
-      (this.nodesMesh.material as ShaderMaterial).dispose();
-      this.nodesMesh = null;
+    // Both meshes share the same geometry; dispose it once via ghostMesh.
+    if (this.ghostMesh) {
+      this.ghostMesh.geometry.dispose();
+      (this.ghostMesh.material as ShaderMaterial).dispose();
+      this.scene.remove(this.ghostMesh);
     }
-    this.alphaAttr = null;
-    this.colorAttr = null;
-    this.sizeAttr = null;
+    if (this.focusedMesh) {
+      (this.focusedMesh.material as ShaderMaterial).dispose();
+      this.scene.remove(this.focusedMesh);
+    }
+    this.ghostMesh  = null;
+    this.focusedMesh = null;
+    this.alphaAttr   = null;
+    this.focusedAttr = null;
+    this.colorAttr   = null;
+    this.sizeAttr    = null;
+    this.nodeCurrentAlphas = null;
+    this.nodeTargetAlphas  = null;
+    this.edgeCurrentAlphas = null;
+    this.edgeTargetAlphas  = null;
   }
 
   private disposeEdges(): void {
@@ -688,40 +741,39 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const N = segs.length;
     const V = N * 4; // 4 vertices per segment
 
-    const posArr = new Float32Array(V * 3); // dummy positions (computed in vertex shader)
+    const posArr   = new Float32Array(V * 3);
     const startArr = new Float32Array(V * 3);
-    const endArr = new Float32Array(V * 3);
+    const endArr   = new Float32Array(V * 3);
     const colorArr = new Float32Array(V * 3);
-    const alphaArr = new Float32Array(V); // initialised to 0; set by updateEdgeAlphas
+    const alphaArr = new Float32Array(V);
     const widthTArr = new Float32Array(V);
     const isEndArr = new Float32Array(V);
-    const sideArr = new Float32Array(V);
-    const idxArr = new Uint32Array(N * 6);
+    const sideArr  = new Float32Array(V);
+    const idxArr   = new Uint32Array(N * 6);
 
-    // Corner pattern: [start-left, start-right, end-right, end-left]
     const IS_END: [number, number, number, number] = [0, 0, 1, 1];
-    const SIDE: [number, number, number, number] = [-1, 1, 1, -1];
+    const SIDE:   [number, number, number, number] = [-1, 1, 1, -1];
 
     for (let i = 0; i < N; i++) {
       const s = segs[i];
       const base = i * 4;
       for (let j = 0; j < 4; j++) {
         const v = base + j;
-        startArr[v * 3] = s.sx;
+        startArr[v * 3]     = s.sx;
         startArr[v * 3 + 1] = s.sy;
         startArr[v * 3 + 2] = s.sz;
-        endArr[v * 3] = s.ex;
-        endArr[v * 3 + 1] = s.ey;
-        endArr[v * 3 + 2] = s.ez;
-        colorArr[v * 3] = s.r;
+        endArr[v * 3]       = s.ex;
+        endArr[v * 3 + 1]   = s.ey;
+        endArr[v * 3 + 2]   = s.ez;
+        colorArr[v * 3]     = s.r;
         colorArr[v * 3 + 1] = s.g;
         colorArr[v * 3 + 2] = s.b;
         widthTArr[v] = s.widthT;
-        isEndArr[v] = IS_END[j];
-        sideArr[v] = SIDE[j];
+        isEndArr[v]  = IS_END[j];
+        sideArr[v]   = SIDE[j];
       }
       const ii = i * 6;
-      idxArr[ii] = base;
+      idxArr[ii]     = base;
       idxArr[ii + 1] = base + 2;
       idxArr[ii + 2] = base + 1;
       idxArr[ii + 3] = base;
@@ -731,52 +783,56 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     const geo = new BufferGeometry();
     geo.setAttribute('position', new BufferAttribute(posArr, 3));
-    geo.setAttribute('aStart', new BufferAttribute(startArr, 3));
-    geo.setAttribute('aEnd', new BufferAttribute(endArr, 3));
-    geo.setAttribute('aColor', new BufferAttribute(colorArr, 3));
+    geo.setAttribute('aStart',   new BufferAttribute(startArr, 3));
+    geo.setAttribute('aEnd',     new BufferAttribute(endArr, 3));
+    geo.setAttribute('aColor',   new BufferAttribute(colorArr, 3));
     this.edgeAlphaAttr = new BufferAttribute(alphaArr, 1);
-    geo.setAttribute('aAlpha', this.edgeAlphaAttr);
-    geo.setAttribute('aWidthT', new BufferAttribute(widthTArr, 1));
-    geo.setAttribute('aIsEnd', new BufferAttribute(isEndArr, 1));
-    geo.setAttribute('aSide', new BufferAttribute(sideArr, 1));
+    geo.setAttribute('aAlpha',   this.edgeAlphaAttr);
+    geo.setAttribute('aWidthT',  new BufferAttribute(widthTArr, 1));
+    geo.setAttribute('aIsEnd',   new BufferAttribute(isEndArr, 1));
+    geo.setAttribute('aSide',    new BufferAttribute(sideArr, 1));
     geo.setIndex(new BufferAttribute(idxArr, 1));
 
     const canvas = this.canvasRef.nativeElement;
     const mat = new ShaderMaterial({
-      vertexShader: EDGE_VERT,
+      vertexShader:   EDGE_VERT,
       fragmentShader: EDGE_FRAG,
       uniforms: {
         uResolution: { value: new Vector2(canvas.clientWidth, canvas.clientHeight) },
-        uWidthMin: { value: this.display.connectorWidthMin / WORLD_SCALE },
-        uWidthMax: { value: this.display.connectorWidthMax / WORLD_SCALE },
+        uWidthMin:   { value: this.display.connectorWidthMin / WORLD_SCALE },
+        uWidthMax:   { value: this.display.connectorWidthMax / WORLD_SCALE },
       },
       transparent: true,
-      depthWrite: false,
+      depthWrite:  false,
     });
 
     this.edgeMesh = new Mesh(geo, mat);
     this.edgeMesh.frustumCulled = false;
-    this.edgeMesh.renderOrder = 1; // draw after dots; depthWrite:false lets dots show through
+    this.edgeMesh.renderOrder = 2;
     this.scene.add(this.edgeMesh);
   }
 
+  // Sets edgeTargetAlphas (per segment). The animator interpolates to these each frame.
   private updateEdgeAlphas(
     focusSet: Set<string> | null,
     pathDimmedFolderPaths: Set<string>,
     foldersWithContent: Set<string>,
   ): void {
-    if (!this.edgeAlphaAttr || !this.edgeSegmentInfo.length) return;
+    if (!this.edgeSegmentInfo.length) return;
     const { showConnectors, depthMin, depthMax, connectorOpacityMin, connectorOpacityMax } =
       this.display;
-    const inFocus = (path: string) => !focusSet || focusSet.has(path);
-    const isPathDim = (path: string) => !focusSet && pathDimmedFolderPaths.has(path);
+    if (!this.edgeTargetAlphas || this.edgeTargetAlphas.length !== this.edgeSegmentInfo.length) {
+      this.edgeTargetAlphas = new Float32Array(this.edgeSegmentInfo.length);
+    }
+    const inFocus   = (path: string) => !focusSet || focusSet.has(path);
+    const isPathDim = (path: string) => pathDimmedFolderPaths.has(path);
     for (let i = 0; i < this.edgeSegmentInfo.length; i++) {
       const { path, pp, depth, depthT, diffUnchanged } = this.edgeSegmentInfo[i];
       const visible =
         showConnectors && foldersWithContent.has(path) && depth >= depthMin && depth <= depthMax;
-      const focused = inFocus(path) && inFocus(pp);
+      const focused  = inFocus(path) && inFocus(pp);
       const pathDimmed = isPathDim(path) || isPathDim(pp);
-      const alpha = !visible
+      this.edgeTargetAlphas[i] = !visible
         ? 0
         : focused
           ? pathDimmed
@@ -785,7 +841,77 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
               ? DIFF_DIM
               : connectorOpacityMax - (connectorOpacityMax - connectorOpacityMin) * depthT
           : DIM;
-      for (let j = 0; j < 4; j++) this.edgeAlphaAttr.setX(i * 4 + j, alpha);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Animation helpers
+  // ---------------------------------------------------------------------------
+
+  private makeNodeMat(pass: number, depthWrite: boolean, depthTest: boolean): ShaderMaterial {
+    const canvas = this.canvasRef.nativeElement;
+    return new ShaderMaterial({
+      vertexShader:   VERT,
+      fragmentShader: FRAG,
+      uniforms: {
+        uPixelRatio: { value: devicePixelRatio },
+        uViewportH:  { value: canvas.clientHeight || 600 },
+        uPass:       { value: pass },
+      },
+      transparent: true,
+      depthWrite,
+      depthTest,
+    });
+  }
+
+  private tickAnimator(dt: number): boolean {
+    if (!this.nodeCurrentAlphas || !this.nodeTargetAlphas) return false;
+    const kDim    = 1 - Math.exp(-dt * 15); // fast dim — keeps z-order correct on selection
+    const kBright = 1 - Math.exp(-dt *  5); // slow bright — perceptually balanced with dim
+    let changed = false;
+    for (let i = 0; i < this.nodeCurrentAlphas.length; i++) {
+      const d = this.nodeTargetAlphas[i] - this.nodeCurrentAlphas[i];
+      if (Math.abs(d) < 0.001) {
+        this.nodeCurrentAlphas[i] = this.nodeTargetAlphas[i];
+      } else {
+        this.nodeCurrentAlphas[i] += d * (d < 0 ? kDim : kBright);
+        changed = true;
+      }
+    }
+    // Promote to focused pass once alpha is nearly full — keeps fade-in symmetric
+    // with fade-out (both visible as the animation runs). updateScene handles the
+    // reverse (focused → ghost) instantly so z-order is always correct when dimming.
+    if (this.focusedAttr) {
+      const focArr = this.focusedAttr.array as Float32Array;
+      let focChanged = false;
+      for (let i = 0; i < this.nodeCurrentAlphas.length; i++) {
+        if (this.nodeTargetAlphas[i] >= 1.0 && this.nodeCurrentAlphas[i] >= 0.9 && focArr[i] < 0.5) {
+          focArr[i] = 1.0;
+          focChanged = true;
+        }
+      }
+      if (focChanged) this.focusedAttr.needsUpdate = true;
+    }
+    if (this.edgeCurrentAlphas && this.edgeTargetAlphas) {
+      for (let i = 0; i < this.edgeCurrentAlphas.length; i++) {
+        const d = this.edgeTargetAlphas[i] - this.edgeCurrentAlphas[i];
+        if (Math.abs(d) < 0.001) {
+          this.edgeCurrentAlphas[i] = this.edgeTargetAlphas[i];
+        } else {
+          this.edgeCurrentAlphas[i] += d * (d < 0 ? kDim : kBright);
+          changed = true;
+        }
+      }
+    }
+    return changed;
+  }
+
+  private flushEdgeAlphas(): void {
+    if (!this.edgeAlphaAttr || !this.edgeCurrentAlphas) return;
+    const arr = this.edgeAlphaAttr.array as Float32Array;
+    for (let i = 0; i < this.edgeCurrentAlphas.length; i++) {
+      const a = this.edgeCurrentAlphas[i];
+      arr[i * 4] = a; arr[i * 4 + 1] = a; arr[i * 4 + 2] = a; arr[i * 4 + 3] = a;
     }
     this.edgeAlphaAttr.needsUpdate = true;
   }
@@ -857,26 +983,24 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     // Camera axes for fixed elevation angle (looking from +Z side, slightly above)
     const elev = 0.2; // ~11°
-    // forward d = (0, -sin, -cos), right r = (1, 0, 0), up u = (0, cos, -sin)
     const sd = Math.sin(elev),
       cd = Math.cos(elev);
 
     // Exact minimum dist: for each node, dist >= |dx|/tanH - dz  AND  |dy|/tanV - dz
-    // where dx/dy/dz are projections of (node - center) onto camera right/up/forward axes.
     let minDist = 0;
     for (const n of nodes) {
-      const vx = -n.x - cx; // Three.js coords relative to scene center
+      const vx = -n.x - cx;
       const vy = n.z - cy;
       const vz = n.y - cz;
 
-      const dx = vx; // dot(v, right=(1,0,0))
-      const dy = vy * cd - vz * sd; // dot(v, up=(0,cos,-sin))
-      const dz = -vy * sd - vz * cd; // dot(v, forward=(0,-sin,-cos))
+      const dx = vx;
+      const dy = vy * cd - vz * sd;
+      const dz = -vy * sd - vz * cd;
 
       minDist = Math.max(minDist, Math.abs(dx) / tanH - dz);
       minDist = Math.max(minDist, Math.abs(dy) / tanV - dz);
     }
-    const dist = minDist * 1.02; // 2% breathing room
+    const dist = minDist * 1.02;
 
     this.controls.target.set(cx, cy, cz);
     this.camera.position.set(cx, cy + dist * sd, cz + dist * cd);
@@ -899,15 +1023,13 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const W = rect.width;
     const H = rect.height;
 
-    // Screen-space hit test: project each point to CSS pixels and check radius.
     let closest: { depth: number; node: PositionedNode; worldPos: Vector3 } | null = null;
     const proj = new Vector3();
-    // projectionMatrix[1][1] = cot(fov/2); used to convert world size → screen pixels
     const focalLen = this.camera.projectionMatrix.elements[5];
 
-    if (!this.nodesMesh) return null;
+    if (!this.ghostMesh) return null;
     {
-      const obj = this.nodesMesh;
+      const obj = this.ghostMesh;
       const nodes = obj.geometry.userData['nodes'] as PositionedNode[];
       const posAttr = obj.geometry.getAttribute('position') as BufferAttribute;
       const sizAttr = obj.geometry.getAttribute('aSize') as BufferAttribute;
@@ -919,26 +1041,22 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
         proj.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
         const worldPos = proj.clone();
-        // Eye-space depth before projecting to NDC
         const eyeZ = proj.applyMatrix4(this.camera.matrixWorldInverse).z;
         proj.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
-        proj.project(this.camera); // → NDC
+        proj.project(this.camera);
 
-        if (proj.z > 1) continue; // behind near/far clip
+        if (proj.z > 1) continue;
 
-        // NDC → CSS pixels
         const sx = ((proj.x + 1) / 2) * W;
         const sy = ((-proj.y + 1) / 2) * H;
 
         const dx = mouseX - sx;
         const dy = mouseY - sy;
 
-        // aSize is in world units; convert to screen-space pixel radius for hit testing
         const screenRadius = ((sizAttr.getX(i) / 2) * focalLen * (H / 2)) / -eyeZ;
         const radius = Math.max(screenRadius, 6);
         if (dx * dx + dy * dy > radius * radius) continue;
 
-        // Among overlapping points pick the one closest to camera (smallest NDC z)
         if (!closest || proj.z < closest.depth) {
           closest = { depth: proj.z, node: nodes[i], worldPos };
         }
@@ -1041,7 +1159,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
   private _onPointerLeave(e: PointerEvent): void {
     if (e.pointerType !== 'mouse') return;
-    if (this.selectedNode) return; // keep pinned tooltip visible
+    if (this.selectedNode) return;
     this.hideTooltip();
     this.canvasRef.nativeElement.style.cursor = '';
   }
@@ -1053,7 +1171,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     }
     const dx = e.clientX - this.mouseDownX;
     const dy = e.clientY - this.mouseDownY;
-    if (dx * dx + dy * dy > 16) return; // drag, not click
+    if (dx * dx + dy * dy > 16) return;
 
     const hit = this.raycast(e, this.dimmedPaths);
     if (hit) {
