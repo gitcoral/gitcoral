@@ -860,8 +860,8 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
   private tickAnimator(dt: number): boolean {
     if (!this.nodeCurrentAlphas || !this.nodeTargetAlphas) return false;
-    const kDim    = 1 - Math.exp(-dt * 15); // fast dim — keeps z-order correct on selection
-    const kBright = 1 - Math.exp(-dt *  5); // slow bright — perceptually balanced with dim
+    const kDim    = 1 - Math.exp(-dt * 10);
+    const kBright = 1 - Math.exp(-dt * 10);
     let changed = false;
     for (let i = 0; i < this.nodeCurrentAlphas.length; i++) {
       const d = this.nodeTargetAlphas[i] - this.nodeCurrentAlphas[i];
