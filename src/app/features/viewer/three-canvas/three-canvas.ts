@@ -135,6 +135,16 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   private edgeCurrentAlphas: Float32Array | null = null;
   private edgeTargetAlphas: Float32Array | null = null;
 
+  // Camera fly-to animation
+  private cameraAnim: {
+    fromPos: Vector3;
+    toPos: Vector3;
+    fromTarget: Vector3;
+    toTarget: Vector3;
+    elapsed: number;
+    duration: number;
+  } | null = null;
+
   // Drag / orbit detection
   private mouseDownX = 0;
   private mouseDownY = 0;
@@ -271,6 +281,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
         this.flushEdgeAlphas();
       }
 
+      this.tickCameraAnim(dt);
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
 
@@ -917,27 +928,48 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   }
 
   resetToDefaultCamera(): void {
-    this.fitCamera();
-    const r = (v: number) => Math.round(v * 100) / 100;
-    const p = this.camera.position,
-      t = this.controls.target;
-    this.cameraChange.emit(`${r(p.x)},${r(p.y)},${r(p.z)},${r(t.x)},${r(t.y)},${r(t.z)}`);
+    const dest = this.computeDefaultCameraState();
+    if (!dest) {
+      this.fitCamera();
+      return;
+    }
+    this.cameraAnim = {
+      fromPos: this.camera.position.clone(),
+      toPos: dest.pos,
+      fromTarget: this.controls.target.clone(),
+      toTarget: dest.target,
+      elapsed: 0,
+      duration: 0.7,
+    };
   }
 
-  private fitCamera(): void {
-    const nodes = this.result?.nodes;
-    if (!nodes?.length) return;
+  private tickCameraAnim(dt: number): void {
+    const anim = this.cameraAnim;
+    if (!anim) return;
+    anim.elapsed += dt;
+    const raw = Math.min(anim.elapsed / anim.duration, 1);
+    const t = raw < 0.5 ? 2 * raw * raw : -1 + (4 - 2 * raw) * raw; // ease-in-out
+    this.camera.position.lerpVectors(anim.fromPos, anim.toPos, t);
+    this.controls.target.lerpVectors(anim.fromTarget, anim.toTarget, t);
+    if (anim.elapsed >= anim.duration) {
+      this.cameraAnim = null;
+      const r = (v: number) => Math.round(v * 100) / 100;
+      const p = this.camera.position,
+        tgt = this.controls.target;
+      this.cameraChange.emit(`${r(p.x)},${r(p.y)},${r(p.z)},${r(tgt.x)},${r(tgt.y)},${r(tgt.z)}`);
+    }
+  }
 
-    // Refresh aspect ratio from actual canvas size
+  private computeDefaultCameraState(): { pos: Vector3; target: Vector3 } | null {
+    const nodes = this.result?.nodes;
+    if (!nodes?.length) return null;
+
     const canvas = this.canvasRef.nativeElement;
     const w = canvas.clientWidth,
       h = canvas.clientHeight;
-    if (w && h) {
-      this.camera.aspect = w / h;
-      this.camera.updateProjectionMatrix();
-    }
+    let aspect = this.camera.aspect;
+    if (w && h) aspect = w / h;
 
-    // Bounding box directly from node positions in Three.js space (-n.x, n.z, n.y)
     let minX = Infinity,
       maxX = -Infinity;
     let minY = Infinity,
@@ -960,33 +992,45 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const cz = (minZ + maxZ) / 2;
 
     const vFov = MathUtils.degToRad(this.camera.fov);
-    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
     const tanH = Math.tan(hFov / 2);
     const tanV = Math.tan(vFov / 2);
 
-    // Camera axes for fixed elevation angle (looking from +Z side, slightly above)
-    const elev = 0.2; // ~11°
+    const elev = 0.2;
     const sd = Math.sin(elev),
       cd = Math.cos(elev);
 
-    // Exact minimum dist: for each node, dist >= |dx|/tanH - dz  AND  |dy|/tanV - dz
     let minDist = 0;
     for (const n of nodes) {
       const vx = -n.x - cx;
       const vy = n.z - cy;
       const vz = n.y - cz;
-
       const dx = vx;
       const dy = vy * cd - vz * sd;
       const dz = -vy * sd - vz * cd;
-
       minDist = Math.max(minDist, Math.abs(dx) / tanH - dz);
       minDist = Math.max(minDist, Math.abs(dy) / tanV - dz);
     }
     const dist = minDist * 1.02;
 
-    this.controls.target.set(cx, cy, cz);
-    this.camera.position.set(cx, cy + dist * sd, cz + dist * cd);
+    return {
+      pos: new Vector3(cx, cy + dist * sd, cz + dist * cd),
+      target: new Vector3(cx, cy, cz),
+    };
+  }
+
+  private fitCamera(): void {
+    const dest = this.computeDefaultCameraState();
+    if (!dest) return;
+
+    const canvas = this.canvasRef.nativeElement;
+    const w = canvas.clientWidth,
+      h = canvas.clientHeight;
+    if (w && h) {
+      this.camera.aspect = w / h;
+    }
+    this.controls.target.copy(dest.target);
+    this.camera.position.copy(dest.pos);
     this.camera.updateProjectionMatrix();
     this.controls.update();
   }
