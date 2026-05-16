@@ -88,20 +88,43 @@ const DEPTH_HUE_SHALLOW = 270; // violet at root, red at deepest
 // File-size coloring
 // ---------------------------------------------------------------------------
 
-// Colors nodes by byte size using rank-based mapping so the full rainbow is always
-// used regardless of size distribution. Folders use subtreeBytes; files use fileSize.
+// Colors files by rank-based file size (violet = smallest, red = largest).
+// Folders get the average of their children's colors, propagated bottom-up,
+// so a folder's hue reflects the typical size of the files it contains.
 export function buildFileSizeColorFn(allNodes: PositionedNode[]): (n: PositionedNode) => Color {
-  const byteOf = (n: PositionedNode) => (n.isFile ? (n.fileSize ?? 0) : n.subtreeBytes);
-  const sorted = [...allNodes].sort((a, b) => byteOf(a) - byteOf(b));
-  const rankMap = new Map<PositionedNode, number>();
-  const last = sorted.length - 1;
-  sorted.forEach((n, i) => rankMap.set(n, last > 0 ? i / last : 0));
+  const files = allNodes.filter((n) => n.isFile);
+  const folders = allNodes.filter((n) => !n.isFile);
 
-  return (n: PositionedNode): Color => {
-    const t = rankMap.get(n) ?? 0;
+  const sorted = [...files].sort((a, b) => (a.fileSize ?? 0) - (b.fileSize ?? 0));
+  const fileColorMap = new Map<PositionedNode, Color>();
+  const last = sorted.length - 1;
+  sorted.forEach((n, i) => {
+    const t = last > 0 ? i / last : 0;
     // Full rainbow sweep: violet (270°) → blue → cyan → green → yellow → red (0°)
-    return hueColor(270 * (1 - t));
-  };
+    fileColorMap.set(n, hueColor(270 * (1 - t)));
+  });
+
+  // Bottom-up: average children's colors into each folder (deepest folders first)
+  const childrenOf = buildChildrenMap(allNodes);
+  const folderColorMap = new Map<string, Color>();
+  for (const folder of [...folders].sort(
+    (a, b) => b.path.split('/').length - a.path.split('/').length,
+  )) {
+    const children = childrenOf.get(folder.path) ?? [];
+    if (!children.length) {
+      folderColorMap.set(folder.path, DEFAULT_COLOR);
+      continue;
+    }
+    const colors = children.map((c) =>
+      c.isFile ? (fileColorMap.get(c) ?? DEFAULT_COLOR) : (folderColorMap.get(c.path) ?? DEFAULT_COLOR),
+    );
+    folderColorMap.set(folder.path, averageColors(colors));
+  }
+
+  return (n: PositionedNode): Color =>
+    n.isFile
+      ? (fileColorMap.get(n) ?? DEFAULT_COLOR)
+      : (folderColorMap.get(n.path) ?? DEFAULT_COLOR);
 }
 
 // ---------------------------------------------------------------------------

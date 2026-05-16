@@ -313,11 +313,40 @@ describe('buildFileSizeColorFn', () => {
     expect(color.r).toBeGreaterThan(color.b);
   });
 
-  it('uses subtreeBytes for folders', () => {
-    const folder = node('src', false, 0, 500_000);
+  it('empty folder gets DEFAULT_COLOR', () => {
+    const folder = node('src', false, 0, 0);
     const fn = buildFileSizeColorFn([folder]);
-    // Should not throw and should return a Color
-    expect(fn(folder)).toBeInstanceOf(Color);
+    const c = fn(folder);
+    expect(c.r).toBeCloseTo(DEFAULT_COLOR.r);
+    expect(c.g).toBeCloseTo(DEFAULT_COLOR.g);
+    expect(c.b).toBeCloseTo(DEFAULT_COLOR.b);
+  });
+
+  it('folder color is the average of its direct file children colors', () => {
+    const folder = node('src', false);
+    const small = node('src/a.ts', true, 0);
+    const large = node('src/b.ts', true, 1_000_000);
+    const fn = buildFileSizeColorFn([folder, small, large]);
+    const colorSmall = fn(small);
+    const colorLarge = fn(large);
+    const folderColor = fn(folder);
+    const expected = averageColors([colorSmall, colorLarge]);
+    expect(folderColor.r).toBeCloseTo(expected.r);
+    expect(folderColor.g).toBeCloseTo(expected.g);
+    expect(folderColor.b).toBeCloseTo(expected.b);
+  });
+
+  it('parent folder incorporates child folder color bottom-up', () => {
+    const parent = node('src', false);
+    const child = node('src/utils', false);
+    const file = node('src/utils/a.ts', true, 0);
+    const fn = buildFileSizeColorFn([parent, child, file]);
+    const childColor = fn(child);
+    const parentColor = fn(parent);
+    // Parent has only one child (the subfolder), so its color equals the child folder color
+    expect(parentColor.r).toBeCloseTo(childColor.r);
+    expect(parentColor.g).toBeCloseTo(childColor.g);
+    expect(parentColor.b).toBeCloseTo(childColor.b);
   });
 
   it('mid-size file has a different color from both extremes', () => {
