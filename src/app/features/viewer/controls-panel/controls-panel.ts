@@ -61,6 +61,7 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
   @Input() autoOrbit = false;
   @Input() initialShow = '';
   @Input() initialVs = '';
+  @Input() initialSphereD = DEFAULT_LAYOUT_PARAMS.sphereD;
   @Input() isDiff = false;
   @Input() diffStats: { added: number; modified: number; deleted: number } | null = null;
   @Output() repoSubmit = new EventEmitter<RepoSubmitEvent>();
@@ -192,6 +193,9 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
     }
     if (changes['initialVs']) {
       this.vsRef = this.initialVs;
+    }
+    if (changes['initialSphereD']) {
+      this.params = { ...this.params, sphereD: this.initialSphereD };
     }
     if (changes['maxFileSize'] && this.maxFileSize > 0) {
       this.fileSizePosMin = 0;

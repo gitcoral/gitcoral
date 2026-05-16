@@ -45,6 +45,7 @@ export class Viewer implements OnInit {
   initialColorMode: ColorMode = 'type';
   initialShow = '';
   initialVs = '';
+  initialSphereD = DEFAULT_LAYOUT_PARAMS.sphereD;
   showRef = '';
   vsRef = '';
 
@@ -118,7 +119,12 @@ export class Viewer implements OnInit {
         const pr = this.route.snapshot.queryParams['pr'] ?? '';
         const show = this.route.snapshot.queryParams['show'] ?? '';
         const vs = this.route.snapshot.queryParams['vs'] ?? '';
+        const sphereD = parseFloat(this.route.snapshot.queryParams['sphereD'] ?? '');
         this.initialQuery = q;
+        if (!isNaN(sphereD) && sphereD > 0) {
+          this.initialSphereD = sphereD;
+          this.params = { ...this.params, sphereD };
+        }
         this.initialColorMode = (['type', 'depth', 'size'] as ColorMode[]).includes(
           color as ColorMode,
         )
@@ -456,6 +462,14 @@ export class Viewer implements OnInit {
 
   onParamsChange(params: LayoutParams): void {
     this.params = params;
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        sphereD: params.sphereD !== DEFAULT_LAYOUT_PARAMS.sphereD ? params.sphereD : null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
     if (this.rawRoot) {
       this.resetCamera = false;
       this.scheduleLayout();
