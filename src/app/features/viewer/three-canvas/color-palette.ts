@@ -116,7 +116,9 @@ export function buildFileSizeColorFn(allNodes: PositionedNode[]): (n: Positioned
       continue;
     }
     const colors = children.map((c) =>
-      c.isFile ? (fileColorMap.get(c) ?? DEFAULT_COLOR) : (folderColorMap.get(c.path) ?? DEFAULT_COLOR),
+      c.isFile
+        ? (fileColorMap.get(c) ?? DEFAULT_COLOR)
+        : (folderColorMap.get(c.path) ?? DEFAULT_COLOR),
     );
     folderColorMap.set(folder.path, averageColors(colors));
   }
