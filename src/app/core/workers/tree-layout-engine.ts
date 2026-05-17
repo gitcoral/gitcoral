@@ -22,7 +22,6 @@ interface LayoutNode {
   connectionWidth: number;
 }
 
-const PHI = (1 + Math.sqrt(5)) / 2; // golden ratio ≈ 1.618
 const GOLDEN_F = Math.PI * (3 - Math.sqrt(5)); // golden-angle step for Fibonacci sphere (= 2π/φ²)
 const SNAP = 1e-10; // snap near-zero coords to exact zero
 
@@ -70,6 +69,7 @@ export function layoutTree(root: TreeStructure, params: LayoutParams): Positione
 
   const layoutRoot = toLayoutNode(root);
   const maxSubtreeCbrt = Math.cbrt(layoutRoot.subtreeBytes);
+  layoutRoot.connectionWidth = maxSubtreeCbrt > 0 ? 1 : 0;
   const maxFileCbrt = maxFileCbrtInTree(layoutRoot);
 
   function place(n: LayoutNode, hintAngle: number, conn: number): void {
@@ -102,13 +102,7 @@ export function layoutTree(root: TreeStructure, params: LayoutParams): Positione
       sf.y = Math.abs(y) < SNAP ? 0 : y;
       sf.z = pz + h * zScale;
 
-      // connectionWidth: cbrt-normalised subtreeBytes → 6 visual buckets.
-      // Stepped (not continuous) so edge-batching produces fewer distinct LineMaterial instances.
-      // Widths follow a φ-geometric progression: 2, 3.2, 5.2, 8.5, 13.7, 22.2
-      const t = Math.cbrt(sf.subtreeBytes) / maxSubtreeCbrt;
-      const N_BUCKETS = 6;
-      const bucket = Math.min(N_BUCKETS - 1, Math.floor(t * N_BUCKETS));
-      sf.connectionWidth = 2 * Math.pow(PHI, bucket);
+      sf.connectionWidth = maxSubtreeCbrt > 0 ? Math.cbrt(sf.subtreeBytes) / maxSubtreeCbrt : 0;
 
       // h * spread: vertical displacement of this node becomes the sphere radius for its
       // children — tighter sphere the deeper we go, floored to avoid vanishing connectors.

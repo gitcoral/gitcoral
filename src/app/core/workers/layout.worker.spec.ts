@@ -73,13 +73,28 @@ describe('layoutTree', () => {
     for (const d of dists) expect(d).toBeCloseTo(dists[0], 5);
   });
 
-  it('folder connectionWidth is in [2, 2·φ⁵] (φ-geometric bucket range)', () => {
+  it('folder connectionWidth is a normalised value in [0, 1]', () => {
     const tree = makeFolder('', [makeFolder('src', [makeFile('src/a.ts'), makeFile('src/b.ts')])]);
     const nodes = layoutTree(tree, PARAMS);
     const src = byPath(nodes, 'src');
-    const PHI = (1 + Math.sqrt(5)) / 2;
-    expect(src.connectionWidth).toBeGreaterThanOrEqual(2);
-    expect(src.connectionWidth).toBeLessThanOrEqual(2 * Math.pow(PHI, 5));
+    expect(src.connectionWidth).toBeGreaterThanOrEqual(0);
+    expect(src.connectionWidth).toBeLessThanOrEqual(1);
+  });
+
+  it('root connectionWidth is 1', () => {
+    const tree = makeFolder('', [makeFolder('src', [makeFile('src/a.ts')])]);
+    const nodes = layoutTree(tree, PARAMS);
+    expect(byPath(nodes, '').connectionWidth).toBe(1);
+  });
+
+  it('parent folder connectionWidth >= child folder connectionWidth', () => {
+    const tree = makeFolder('', [makeFolder('a', [makeFolder('a/b', [makeFile('a/b/x.ts')])])]);
+    const nodes = layoutTree(tree, PARAMS);
+    const root = byPath(nodes, '');
+    const a = byPath(nodes, 'a');
+    const ab = byPath(nodes, 'a/b');
+    expect(root.connectionWidth).toBeGreaterThanOrEqual(a.connectionWidth);
+    expect(a.connectionWidth).toBeGreaterThanOrEqual(ab.connectionWidth);
   });
 
   it('single subfolder is placed at non-zero distance from root', () => {

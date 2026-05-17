@@ -52,8 +52,6 @@ const DIM = 0.08;
 const PATH_DIM = 0.08;
 const DIFF_DIM = 0.12;
 const BG = new Color(0x0c0e12);
-const EDGE_WIDTH_IN_MIN = 2;
-const EDGE_WIDTH_IN_MAX = 12;
 const WORLD_SCALE = 100;
 
 // ---------------------------------------------------------------------------
@@ -715,13 +713,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       const depthT = Math.min((node.z - zMin) / zRange, 1.0);
       const depth = node.path.split('/').length;
       const diffUnchanged = !!this.result?.isDiff && node.diffStatus === 'unchanged';
-      const widthT = Math.max(
-        0,
-        Math.min(
-          1,
-          (node.connectionWidth - EDGE_WIDTH_IN_MIN) / (EDGE_WIDTH_IN_MAX - EDGE_WIDTH_IN_MIN),
-        ),
-      );
+      const widthT = parent.connectionWidth;
 
       // Swap Y↔Z: layout Z is elevation → Three.js Y
       segs.push({
