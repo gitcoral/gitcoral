@@ -48,6 +48,13 @@ import { buildFocusSet, fileExt, hashPath, makeCbrtNormalizer, parentPath } from
 // Constants
 // ---------------------------------------------------------------------------
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
 const DIM = 0.08;
 const PATH_DIM = 0.08;
 const DIFF_DIM = 0.12;
@@ -1134,11 +1141,11 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       line1.textContent = node.path || '(root)';
     }
     this.tipEl.replaceChildren(line1);
-    if (node.isFile) {
-      const line2 = document.createElement('div');
-      line2.textContent = `${(node.fileSize ?? 0).toLocaleString()} bytes`;
-      this.tipEl.appendChild(line2);
-    }
+    const sizeLine = document.createElement('div');
+    sizeLine.textContent = node.isFile
+      ? formatBytes(node.fileSize ?? 0)
+      : formatBytes(node.subtreeBytes);
+    this.tipEl.appendChild(sizeLine);
     if (node.diffStatus) {
       const diffLine = document.createElement('div');
       diffLine.textContent = node.diffStatus;

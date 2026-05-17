@@ -69,7 +69,7 @@ export function layoutTree(root: TreeStructure, params: LayoutParams): Positione
 
   const layoutRoot = toLayoutNode(root);
   const maxSubtreeCbrt = Math.cbrt(layoutRoot.subtreeBytes);
-  layoutRoot.connectionWidth = maxSubtreeCbrt > 0 ? 1 : 0;
+  layoutRoot.connectionWidth = maxSubtreeCbrt > 0 ? 1 : 0; // t²=1²=1
   const maxFileCbrt = maxFileCbrtInTree(layoutRoot);
 
   function place(n: LayoutNode, hintAngle: number, conn: number): void {
@@ -102,7 +102,8 @@ export function layoutTree(root: TreeStructure, params: LayoutParams): Positione
       sf.y = Math.abs(y) < SNAP ? 0 : y;
       sf.z = pz + h * zScale;
 
-      sf.connectionWidth = maxSubtreeCbrt > 0 ? Math.cbrt(sf.subtreeBytes) / maxSubtreeCbrt : 0;
+      const t = maxSubtreeCbrt > 0 ? Math.cbrt(sf.subtreeBytes) / maxSubtreeCbrt : 0;
+      sf.connectionWidth = t * t;
 
       // h * spread: vertical displacement of this node becomes the sphere radius for its
       // children — tighter sphere the deeper we go, floored to avoid vanishing connectors.

@@ -6,7 +6,12 @@ export function simulate(weights: number[], buoy: number, repel: number): Array<
   if (N === 1) return [[0.0, 0.0]];
 
   const maxW = weights.reduce((m, v) => (v > m ? v : m), 0);
-  const thetas = new Float64Array(N).fill(Math.PI / 3);
+  const sqDenom = maxW || 1;
+  // Initialise theta inversely proportional to weight so the heaviest node
+  // starts near vertical — gives buoyancy a head start over repulsion.
+  const thetas = Float64Array.from({ length: N }, (_, i) =>
+    Math.max(1e-6, ((Math.PI * 5) / 12) * (1 - Math.sqrt(weights[i] / sqDenom))),
+  );
   const phis = Float64Array.from({ length: N }, (_, i) => (i * 2 * Math.PI) / N);
 
   // Pre-allocate reusable buffers — no per-step heap allocation
@@ -16,7 +21,6 @@ export function simulate(weights: number[], buoy: number, repel: number): Array<
   const dt = new Float64Array(N);
   const dp = new Float64Array(N);
   const sq = new Float64Array(N); // sqrt(w/maxW) per node
-  const sqDenom = maxW || 1; // guard: all-zero weights would produce 0/0 = NaN
   for (let i = 0; i < N; i++) sq[i] = Math.sqrt(weights[i] / sqDenom);
 
   const LR = 0.05;
