@@ -713,7 +713,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       const depthT = Math.min((node.z - zMin) / zRange, 1.0);
       const depth = node.path.split('/').length;
       const diffUnchanged = !!this.result?.isDiff && node.diffStatus === 'unchanged';
-      const widthT = parent.connectionWidth;
+      const widthT = node.connectionWidth;
 
       // Swap Y↔Z: layout Z is elevation → Three.js Y
       segs.push({
