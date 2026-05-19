@@ -1,4 +1,3 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://gitcoral.com/sitemap.xml
