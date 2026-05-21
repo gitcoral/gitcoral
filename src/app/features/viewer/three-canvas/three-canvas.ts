@@ -394,12 +394,13 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
 
     this.updateScene();
 
-    // Snap current to target for initial load — no fade-in on first display.
-    this.nodeCurrentAlphas.set(this.nodeTargetAlphas);
-    (this.alphaAttr.array as Float32Array).set(this.nodeCurrentAlphas);
+    // Start all nodes invisible — tickAnimator fades them in.
+    this.nodeCurrentAlphas.fill(0);
+    (this.alphaAttr.array as Float32Array).fill(0);
     this.alphaAttr.needsUpdate = true;
+
     if (this.edgeTargetAlphas) {
-      this.edgeCurrentAlphas = new Float32Array(this.edgeTargetAlphas);
+      this.edgeCurrentAlphas = new Float32Array(this.edgeTargetAlphas.length);
       this.flushEdgeAlphas();
     }
   }
@@ -872,6 +873,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
     const kDim = 1 - Math.exp(-dt * 10);
     const kBright = 1 - Math.exp(-dt * 10);
     let changed = false;
+
     for (let i = 0; i < this.nodeCurrentAlphas.length; i++) {
       const d = this.nodeTargetAlphas[i] - this.nodeCurrentAlphas[i];
       if (Math.abs(d) < 0.001) {
