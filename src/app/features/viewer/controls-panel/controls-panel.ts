@@ -92,6 +92,8 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
     { repo: 'facebook/react', image: '/examples/facebook-react.png' },
     { repo: 'torvalds/linux', image: '/examples/torvalds-linux.png' },
     { repo: 'angular/angular', image: '/examples/angular-angular.png' },
+    { repo: 'microsoft/vscode', image: '/examples/microsoft-vscode.png' },
+    { repo: 'kubernetes/kubernetes', image: '/examples/kubernetes-kubernetes.png' },
   ];
 
   // Log-scale slider positions (0–1000); converted to bytes on change.
