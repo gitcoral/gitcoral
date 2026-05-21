@@ -256,7 +256,6 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
       this.isOrbiting = true;
       this.canvasRef.nativeElement.style.cursor = '';
       if (!this.selectedNode) this.hideTooltip();
-      if (this.autoOrbit) this.autoOrbitChange.emit(false);
     });
     this.controls.addEventListener('change', () => {
       if (this.isOrbiting) this.didOrbit = true;
@@ -1099,6 +1098,7 @@ export class ThreeCanvas implements OnInit, OnChanges, OnDestroy {
   private _onMouseDown(e: MouseEvent): void {
     this.mouseDownX = e.clientX;
     this.mouseDownY = e.clientY;
+    if (this.autoOrbit) this.autoOrbitChange.emit(false);
   }
 
   private showTooltip(node: PositionedNode, worldPos: Vector3, isSelected = false): void {
