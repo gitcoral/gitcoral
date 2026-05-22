@@ -3,6 +3,7 @@ import {
   Component,
   ElementRef,
   EventEmitter,
+  HostListener,
   Input,
   OnDestroy,
   OnInit,
@@ -395,5 +396,21 @@ export class ControlsPanel implements OnInit, OnChanges, AfterViewInit, OnDestro
 
   toggleCollapse(): void {
     this.collapsed = !this.collapsed;
+  }
+
+  @HostListener('document:pointerup', ['$event'])
+  onDocumentPointerUp(event: PointerEvent): void {
+    if (this.el.nativeElement.contains(event.target as Node)) return;
+    const host = this.el.nativeElement;
+    // Remove stuck pointer-events:none left on range-slider siblings when drag ends outside the panel
+    host.querySelectorAll<HTMLElement>('.mat-mdc-slider-input-no-pointer-events').forEach((el) => {
+      el.classList.remove('mat-mdc-slider-input-no-pointer-events');
+    });
+    // Dispatch synthetic pointerup + blur to clear Angular Material's _isActive / _isFocused
+    const focused = host.querySelector<HTMLElement>('input[type="range"]:focus');
+    if (focused) {
+      focused.dispatchEvent(new PointerEvent('pointerup', { bubbles: false, cancelable: true }));
+      focused.blur();
+    }
   }
 }
